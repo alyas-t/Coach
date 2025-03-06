@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TextToSpeech from "@/utils/textToSpeech";
+import VoiceCheckIn from "@/components/ui/voiceCheckIn";
 
 const DailyCheckIn = () => {
   const [checkIns, setCheckIns] = useState<any[]>([]);
@@ -120,10 +121,17 @@ const DailyCheckIn = () => {
     
     setIsSaving(true);
     try {
+      const response = responses[checkIn.id]?.trim() || '';
+      
+      if (!response) {
+        toast.error("Please provide a response before completing");
+        return;
+      }
+      
       const { error } = await supabase
         .from('check_ins')
         .update({
-          response: responses[checkIn.id] || '',
+          response: response,
           completed: true,
           completed_at: new Date().toISOString()
         })
@@ -134,10 +142,14 @@ const DailyCheckIn = () => {
       setCheckIns(prev => 
         prev.map(item => 
           item.id === checkIn.id 
-            ? {...item, completed: true, response: responses[checkIn.id] || ''} 
+            ? {...item, completed: true, response: response} 
             : item
         )
       );
+      
+      // Trigger a refetch of user's check-ins
+      await checkOnboardingStatus();
+      
       toast.success("Check-in completed successfully!");
     } catch (error) {
       console.error("Error saving check-in:", error);
@@ -146,7 +158,7 @@ const DailyCheckIn = () => {
       setIsSaving(false);
     }
   };
-  
+
   const handleSkip = async (checkIn: any) => {
     if (!checkIn || !user) return;
     
@@ -177,9 +189,101 @@ const DailyCheckIn = () => {
       setIsSaving(false);
     }
   };
-  
+
   const handleSpeakQuestion = (question: string) => {
     tts.speak(question);
+  };
+
+  const handleVoiceTranscription = (checkInId: string, text: string) => {
+    setResponses(prev => ({
+      ...prev,
+      [checkInId]: (prev[checkInId] || '') + ' ' + text
+    }));
+  };
+
+  const renderCheckInForm = (checkIn: any) => {
+    if (checkIn.completed) {
+      return (
+        <div className="p-6 text-center bg-muted/20 rounded-lg">
+          <p className="text-muted-foreground">
+            You've already completed your {checkIn.check_in_type} check-in for today.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-4"
+      >
+        <div className="flex justify-between items-center">
+          <h4 className="text-lg font-medium">{checkIn.question}</h4>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-muted-foreground"
+              onClick={() => handleSpeakQuestion(checkIn.question)}
+            >
+              <span className="sr-only">Listen</span>
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-muted/50 rounded-lg p-4 min-h-[100px] border border-border">
+          <Textarea
+            className="w-full bg-transparent resize-none focus:outline-none min-h-[80px]"
+            placeholder="Type your response here..."
+            value={responses[checkIn.id] || ''}
+            onChange={(e) => setResponses(prev => ({ ...prev, [checkIn.id]: e.target.value }))}
+          />
+          <div className="flex justify-center mt-4">
+            <VoiceCheckIn
+              onTranscription={(text) => handleVoiceTranscription(checkIn.id, text)}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button variant="outline" size="sm" onClick={() => handleSkip(checkIn)} disabled={isSaving}>
+            <X className="h-4 w-4 mr-1" /> Skip
+          </Button>
+          <Button 
+            size="sm" 
+            onClick={() => handleComplete(checkIn)} 
+            disabled={isSaving || !(responses[checkIn.id] || '').trim()}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4 mr-1" /> Complete
+              </>
+            )}
+          </Button>
+        </div>
+      </motion.div>
+    );
   };
 
   if (isLoading) {
@@ -254,99 +358,7 @@ const DailyCheckIn = () => {
         {Object.entries(checkInsByType).map(([type, checkIn]) => (
           <TabsContent key={type} value={type} className="p-0 m-0">
             <CardContent className="p-6">
-              {!checkIn.completed ? (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >            
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium">{checkIn.question}</h4>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-muted-foreground"
-                      onClick={() => handleSpeakQuestion(checkIn.question)}
-                    >
-                      <span className="sr-only">Listen</span>
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="16" 
-                        height="16" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round"
-                      >
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-                      </svg>
-                    </Button>
-                  </div>
-                  
-                  <div className="bg-muted/50 rounded-lg p-4 min-h-[100px] border border-border">
-                    <Textarea
-                      className="w-full bg-transparent resize-none focus:outline-none min-h-[80px]"
-                      placeholder="Type your response here..."
-                      value={responses[checkIn.id] || ''}
-                      onChange={(e) => setResponses(prev => ({ ...prev, [checkIn.id]: e.target.value }))}
-                    />
-                  </div>
-                  
-                  <div className="flex justify-end gap-3 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => handleSkip(checkIn)} disabled={isSaving}>
-                      <X className="h-4 w-4 mr-1" /> Skip
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleComplete(checkIn)} 
-                      disabled={isSaving || !(responses[checkIn.id] || '').trim()}
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-1" /> Complete
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </motion.div>
-              ) : (
-                <div className="p-6 text-center bg-muted/20 rounded-lg">
-                  <p className="text-muted-foreground">
-                    You've already completed your {type} check-in for today.
-                  </p>
-                  {type === 'morning' && !checkInsByType.evening?.completed && (
-                    <Button 
-                      variant="link" 
-                      size="sm" 
-                      className="mt-2" 
-                      onClick={() => setActiveTab('evening')}
-                      disabled={!checkInsByType.evening}
-                    >
-                      Go to evening check-in <ArrowRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  )}
-                  {type === 'evening' && !checkInsByType.morning?.completed && (
-                    <Button 
-                      variant="link" 
-                      size="sm" 
-                      className="mt-2" 
-                      onClick={() => setActiveTab('morning')}
-                      disabled={!checkInsByType.morning}
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-1" /> Go to morning check-in
-                    </Button>
-                  )}
-                </div>
-              )}
+              {renderCheckInForm(checkIn)}
             </CardContent>
           </TabsContent>
         ))}
