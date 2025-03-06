@@ -158,18 +158,23 @@ export function useChatMessages() {
     }
     
     // Otherwise load messages
-    await loadInitialMessages();
+    try {
+      await loadInitialMessages();
     
-    // Convert and return the loaded messages
-    return messages
-      .slice()
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      .map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        sender: msg.sender,
-        timestamp: new Date(msg.created_at)
-      }));
+      // Convert and return the loaded messages
+      return messages
+        .slice()
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: new Date(msg.created_at)
+        }));
+    } catch (error) {
+      console.error('Error getting messages:', error);
+      return [];
+    }
   };
 
   // Function to send a message and return it in the Message format
@@ -188,6 +193,8 @@ export function useChatMessages() {
   // Function to generate a coach response using only Gemini API
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
+      console.log("Generating coach response with Gemini API");
+      
       // Call the Edge Function to get AI response from Gemini
       const { data, error } = await supabase.functions.invoke('gemini-chat', {
         body: {
@@ -199,7 +206,15 @@ export function useChatMessages() {
         }
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase function error:", error);
+        throw error;
+      }
+      
+      if (!data || !data.response) {
+        console.error("Invalid response from Gemini API:", data);
+        throw new Error("Invalid response from AI service");
+      }
       
       return data.response || "I'm sorry, I couldn't generate a response.";
     } catch (error) {
@@ -237,14 +252,19 @@ export function useChatMessages() {
     if (!user) return [];
     
     try {
-      // Using a raw SQL query to get distinct days
+      console.log("Getting chat days for user:", user.id);
+      
+      // Using a direct query to get distinct dates
       const { data, error } = await supabase
         .from('chat_messages')
         .select('created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error getting chat days:', error);
+        throw error;
+      }
       
       // Extract unique dates (YYYY-MM-DD format)
       const uniqueDates = new Set<string>();
@@ -253,6 +273,7 @@ export function useChatMessages() {
         uniqueDates.add(dateOnly);
       });
       
+      console.log("Retrieved unique chat days:", Array.from(uniqueDates));
       return Array.from(uniqueDates);
     } catch (error) {
       console.error('Error getting chat days:', error);

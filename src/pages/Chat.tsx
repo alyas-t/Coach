@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ChatInterface from "@/components/chat/ChatInterface";
 import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
@@ -10,15 +10,18 @@ import { History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [lastChatDate, setLastChatDate] = useState<string | null>(null);
   const [historicalDates, setHistoricalDates] = useState<string[]>([]);
   const { getChatDays } = useChatMessages();
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -37,14 +40,25 @@ const Chat = () => {
       setLastChatDate(storedChatDate);
     }
     
+    // Check if we have a date parameter in the URL
+    const dateParam = searchParams.get('date');
+    if (dateParam) {
+      localStorage.setItem('view_chat_date', dateParam);
+    }
+    
     // Load chat history dates
     const loadChatDays = async () => {
       setIsLoadingHistory(true);
+      setHistoryError(false);
+      
       try {
+        console.log("Loading chat history days");
         const days = await getChatDays();
+        console.log("Received chat days:", days);
         setHistoricalDates(days);
       } catch (error) {
         console.error("Error loading chat history:", error);
+        setHistoryError(true);
         toast.error("Failed to load chat history");
       } finally {
         setIsLoadingHistory(false);
@@ -52,7 +66,7 @@ const Chat = () => {
     };
     
     loadChatDays();
-  }, [user, navigate, getChatDays]);
+  }, [user, navigate, getChatDays, searchParams]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -68,6 +82,25 @@ const Chat = () => {
     localStorage.setItem('view_chat_date', date);
     navigate(`/chat?date=${date}`);
     setIsHistoryOpen(false);
+  };
+
+  const retryLoadHistory = async () => {
+    if (isLoadingHistory) return;
+    
+    setIsLoadingHistory(true);
+    setHistoryError(false);
+    
+    try {
+      const days = await getChatDays();
+      setHistoricalDates(days);
+      toast.success("Chat history loaded successfully");
+    } catch (error) {
+      console.error("Error reloading chat history:", error);
+      setHistoryError(true);
+      toast.error("Failed to load chat history");
+    } finally {
+      setIsLoadingHistory(false);
+    }
   };
 
   if (!user) return null;
@@ -95,7 +128,18 @@ const Chat = () => {
                 <div className="p-4 h-full overflow-y-auto">
                   <h3 className="text-lg font-medium mb-4">Chat History</h3>
                   {isLoadingHistory ? (
-                    <p className="text-muted-foreground">Loading history...</p>
+                    <div className="space-y-2">
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : historyError ? (
+                    <div className="text-center py-6">
+                      <p className="text-muted-foreground mb-4">Failed to load chat history</p>
+                      <Button onClick={retryLoadHistory}>
+                        Retry
+                      </Button>
+                    </div>
                   ) : historicalDates.length > 0 ? (
                     <ul className="space-y-2">
                       {historicalDates.map((date) => (
@@ -111,7 +155,7 @@ const Chat = () => {
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-muted-foreground">No chat history found</p>
+                    <p className="text-muted-foreground text-center py-6">No chat history found</p>
                   )}
                   
                   <div className="mt-4">

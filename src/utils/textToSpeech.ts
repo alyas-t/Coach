@@ -1,7 +1,7 @@
+
 /**
- * A utility for handling text-to-speech functionality using Gemini API
+ * A utility for handling text-to-speech functionality using browser's SpeechSynthesis API
  */
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 class TextToSpeech {
@@ -14,7 +14,6 @@ class TextToSpeech {
   private onSpeakStartCallbacks: Array<() => void> = [];
   private onSpeakEndCallbacks: Array<() => void> = [];
   private voicePreference: string | null = null;
-  private useEdgeFunction: boolean = false; // Changed to false as default since Gemini doesn't support direct TTS
   private audio: HTMLAudioElement | null = null;
 
   private constructor() {
@@ -39,8 +38,12 @@ class TextToSpeech {
   private loadVoices(): void {
     if (!this.speechSynthesis) return;
     
-    this.voices = this.speechSynthesis.getVoices();
-    this.selectPreferredVoice();
+    try {
+      this.voices = this.speechSynthesis.getVoices();
+      this.selectPreferredVoice();
+    } catch (error) {
+      console.error("Error loading voices:", error);
+    }
   }
 
   private selectPreferredVoice(): void {
@@ -66,9 +69,11 @@ class TextToSpeech {
     }
     
     // Fallback to the first English voice if no preferred voice is found
-    if (!this.preferredVoice) {
-      this.preferredVoice = this.voices.find(voice => voice.lang.startsWith('en')) || null;
+    if (!this.preferredVoice && this.voices.length > 0) {
+      this.preferredVoice = this.voices.find(voice => voice.lang.startsWith('en')) || this.voices[0];
     }
+    
+    console.log("Selected voice:", this.preferredVoice?.name || "No voice available");
   }
 
   public setVoicePreference(voiceName: string): void {
@@ -78,13 +83,6 @@ class TextToSpeech {
 
   public getAvailableVoices(): SpeechSynthesisVoice[] {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
-  }
-
-  // This method returns a static list since we're not using ElevenLabs anymore
-  public getGeminiVoiceOptions(): {id: string, name: string}[] {
-    return [
-      { id: "standard", name: "Standard Voice" }
-    ];
   }
 
   public async speak(text: string, onEnd?: () => void): Promise<void> {
@@ -100,58 +98,13 @@ class TextToSpeech {
     this.notifySpeakStart();
 
     try {
-      if (this.useEdgeFunction) {
-        try {
-          await this.speakWithGemini(text, onEnd);
-        } catch (error) {
-          console.error('Error using Gemini for TTS:', error);
-          // Fall back to browser TTS
-          this.useEdgeFunction = false;
-          this.speakWithBrowser(text, onEnd);
-        }
-      } else {
-        this.speakWithBrowser(text, onEnd);
-      }
+      this.speakWithBrowser(text, onEnd);
     } catch (error) {
       console.error('Error during text-to-speech:', error);
+      toast.error("Failed to generate speech. Please try again.");
       this.isSpeaking = false;
       this.notifySpeakEnd();
       if (onEnd) onEnd();
-    }
-  }
-
-  private async speakWithGemini(text: string, onEnd?: () => void): Promise<void> {
-    try {
-      toast.info("Generating speech...");
-      
-      const { data, error } = await supabase.functions.invoke("gemini-chat", {
-        body: { 
-          action: "text_to_speech",
-          voiceText: text
-        }
-      });
-
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw error;
-      }
-
-      if (data && data.message) {
-        console.log("TTS message:", data.message);
-        // Since Gemini doesn't support TTS directly, we fall back to browser TTS
-        this.useEdgeFunction = false;
-        this.speakWithBrowser(text, onEnd);
-        toast.dismiss();
-      } else {
-        throw new Error("No valid response from TTS service");
-      }
-    } catch (error: any) {
-      console.error("Text-to-speech error:", error);
-      toast.error("Failed to generate speech: " + (error.message || "Unknown error"));
-      
-      // Fall back to browser TTS
-      this.useEdgeFunction = false;
-      this.speakWithBrowser(text, onEnd);
     }
   }
 
@@ -163,30 +116,39 @@ class TextToSpeech {
       return;
     }
     
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    if (this.preferredVoice) {
-      utterance.voice = this.preferredVoice;
-    }
-    
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    
-    utterance.onend = () => {
-      this.isSpeaking = false;
-      this.notifySpeakEnd();
-      if (onEnd) onEnd();
-    };
-    
-    utterance.onerror = (event) => {
-      console.error('Speech synthesis error:', event);
-      this.isSpeaking = false;
-      this.notifySpeakEnd();
-      if (onEnd) onEnd();
-    };
+    try {
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      if (this.preferredVoice) {
+        utterance.voice = this.preferredVoice;
+      }
+      
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        this.notifySpeakEnd();
+        if (onEnd) onEnd();
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        toast.error("Speech synthesis failed. Please try again.");
+        this.isSpeaking = false;
+        this.notifySpeakEnd();
+        if (onEnd) onEnd();
+      };
 
-    this.speechSynthesis.speak(utterance);
+      this.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.error('Error in browser speech synthesis:', error);
+      toast.error("Failed to generate speech. Please try again.");
+      this.isSpeaking = false;
+      this.notifySpeakEnd();
+      if (onEnd) onEnd();
+    }
   }
 
   public cancel(): void {

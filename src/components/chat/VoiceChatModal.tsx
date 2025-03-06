@@ -1,10 +1,12 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, Mic, StopCircle, Volume2, Loader2 } from "lucide-react";
+import { X, Mic, StopCircle, Volume2, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { toast } from "sonner";
 import TextToSpeech from "@/utils/textToSpeech";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface VoiceChatModalProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   const [amplitude, setAmplitude] = useState(0);
   const [aiSpeaking, setAiSpeaking] = useState(false);
   const [processingTimeout, setProcessingTimeout] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -29,6 +32,8 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   
   useEffect(() => {
     if (isOpen) {
+      setError(null);
+      
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();
@@ -55,17 +60,19 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
         recognitionRef.current.onerror = (event: any) => {
           console.error('Speech recognition error', event.error);
           if (event.error === 'not-allowed') {
+            setError("Microphone access denied. Please allow microphone access to use voice chat.");
             toast.error("Microphone access denied. Please allow microphone access to use voice chat.");
-            onClose();
           } else if (event.error === 'network') {
+            setError("Network error. Please check your connection.");
             toast.error("Network error. Please check your connection.");
           } else {
+            setError(`Recognition error: ${event.error}`);
             toast.error(`Recognition error: ${event.error}`);
           }
         };
       } else {
+        setError("Your browser doesn't support speech recognition. Please try a different browser.");
         toast.error("Your browser doesn't support speech recognition. Please try a different browser.");
-        onClose();
       }
       
       tts.current.onSpeakStart(() => setAiSpeaking(true));
@@ -149,7 +156,13 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
 
   const setupAudioVisualization = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
       mediaStreamRef.current = stream;
       
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -162,6 +175,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
       analyserRef.current.fftSize = 256;
     } catch (error) {
       console.error("Error accessing microphone:", error);
+      setError("Could not access microphone. Please check your permissions.");
       toast.error("Could not access microphone. Please check your permissions.");
       setIsListening(false);
     }
@@ -181,6 +195,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   };
 
   const startListening = () => {
+    setError(null);
     if (recognitionRef.current) {
       try {
         recognitionRef.current.start();
@@ -188,6 +203,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
         setTranscript("");
       } catch (error) {
         console.error("Error starting speech recognition:", error);
+        setError("Could not start speech recognition. Please try again.");
         toast.error("Could not start speech recognition");
       }
     }
@@ -207,6 +223,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   const sendTranscriptToAI = async () => {
     if (!transcript.trim() || isProcessing) return;
     
+    setError(null);
     const message = transcript.trim();
     setTranscript("");
     setIsProcessing(true);
@@ -227,6 +244,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
           setTranscript(shorterMessage);
         }, 1000);
       } else {
+        setError("AI response is taking too long. Please try again with a simpler message.");
         toast.error("AI response is taking too long. Please try again with a simpler message.");
         setIsProcessing(false);
         processingRetryCount.current = 0;
@@ -242,6 +260,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
       processingRetryCount.current = 0;
     } catch (error) {
       console.error("Error processing message:", error);
+      setError("Something went wrong. Please try again with a shorter message.");
       toast.error("Something went wrong. Please try again with a shorter message.");
     } finally {
       clearProcessingTimeout();
@@ -265,6 +284,15 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
         </DialogHeader>
         
         <div className="py-6">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+          
           <div className="mb-4 p-4 bg-muted/20 rounded-lg border border-border min-h-[100px] text-center">
             {isProcessing ? (
               <div className="flex items-center justify-center h-full">
