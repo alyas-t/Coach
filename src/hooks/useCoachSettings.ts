@@ -27,6 +27,7 @@ export function useCoachSettings() {
     console.log("Saving coach settings:", settings);
     
     try {
+      // Create the update data with snake_case for the database
       const updateData = {
         coach_style: settings.coachStyle,
         coach_tone: settings.coachTone,

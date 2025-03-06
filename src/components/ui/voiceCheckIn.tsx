@@ -59,14 +59,19 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
         try {
           const base64Audio = (reader.result as string).split(',')[1];
           
+          console.log("Sending audio to voice-to-text function");
+          
           // Call the Supabase Edge Function
           const { data, error } = await supabase.functions.invoke("voice-to-text", {
             body: { audio: base64Audio }
           });
           
           if (error) {
+            console.error("Supabase function error:", error);
             throw error;
           }
+          
+          console.log("Received transcription response:", data);
           
           if (data && data.text) {
             onTranscription(data.text);
@@ -74,18 +79,18 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
           } else {
             toast.error("No transcription received");
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Transcription error:", error);
-          toast.error("Failed to transcribe audio");
+          toast.error("Failed to transcribe audio: " + (error.message || "Unknown error"));
         } finally {
           setIsTranscribing(false);
         }
       };
       
       reader.readAsDataURL(audioBlob);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing audio:", error);
-      toast.error("Failed to process audio");
+      toast.error("Failed to process audio: " + (error.message || "Unknown error"));
       setIsTranscribing(false);
     }
   };

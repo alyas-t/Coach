@@ -150,6 +150,11 @@ serve(async (req) => {
 
     console.log("Sending request to Gemini API");
     
+    // Verify that we have a valid API key
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY environment variable is not set");
+    }
+    
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
@@ -188,6 +193,7 @@ serve(async (req) => {
     console.log("Gemini API response received");
     
     if (!response.ok) {
+      console.error("Gemini API error:", data);
       throw new Error(data.error?.message || "Error calling Gemini API");
     }
 
