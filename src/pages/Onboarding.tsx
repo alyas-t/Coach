@@ -36,36 +36,39 @@ const Onboarding = () => {
           setLoadingTimeout(true);
         }, 5000);
         
-        // Check if the user has any goals set (indicating completed onboarding)
-        const { data: goals, error: goalsError } = await supabase
-          .from('goals')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
+        // Simplified check: we'll just start onboarding if we can't determine status
+        let hasCompletedOnboarding = false;
+        
+        try {
+          // Try to check if the user has any goals set
+          const { data: goals, error: goalsError } = await supabase
+            .from('goals')
+            .select('id')
+            .eq('user_id', user.id)
+            .limit(1);
+            
+          if (!goalsError && goals && goals.length > 0) {
+            hasCompletedOnboarding = true;
+          }
           
-        if (goalsError) {
-          console.error("Error checking goals:", goalsError);
-          setError("Could not verify your account status: " + goalsError.message);
-          return;
+          // Only check profile if goals check didn't confirm completion
+          if (!hasCompletedOnboarding) {
+            const { data: profileData, error: profileError } = await supabase
+              .from('profiles')
+              .select('coach_style, coach_tone')
+              .eq('id', user.id)
+              .maybeSingle();
+              
+            if (!profileError && profileData && (profileData.coach_style || profileData.coach_tone)) {
+              hasCompletedOnboarding = true;
+            }
+          }
+        } catch (err) {
+          console.error("Error in onboarding checks:", err);
+          // If there's an error, we'll just continue to onboarding
         }
         
-        // Check if the user has coach settings in their profile (another onboarding indicator)
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('coach_style, coach_tone')
-          .eq('id', user.id)
-          .maybeSingle();
-          
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error("Error checking profile:", profileError);
-          setError("Could not verify your profile status: " + profileError.message);
-          return;
-        }
-        
-        // If user has either goals or coach settings defined in their profile, they've likely completed onboarding
-        if ((goals && goals.length > 0) || 
-            (profileData && (profileData.coach_style || profileData.coach_tone))) {
-          // Redirect to dashboard as they've already completed onboarding
+        if (hasCompletedOnboarding) {
           navigate('/dashboard');
         }
       } catch (error: any) {

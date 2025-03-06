@@ -26,61 +26,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error("Error fetching session:", error);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Error fetching session:", error);
+          setIsLoading(false);
+          return;
+        }
+        
+        setSession(data.session);
+        setUser(data.session?.user || null);
+      } catch (e) {
+        console.error("Exception fetching session:", e);
+      } finally {
+        setIsLoading(false);
       }
-      
-      setSession(data.session);
-      setUser(data.session?.user || null);
-      setIsLoading(false);
     };
 
     fetchSession();
 
     const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log("Auth state changed:", event, !!newSession);
       setSession(newSession);
       setUser(newSession?.user || null);
       
       if (event === 'SIGNED_IN' && newSession) {
-        setIsLoading(true);
+        // Don't set loading again - this prevents infinite loops
         try {
-          // Check if the user has completed onboarding by checking for goals or coach settings
-          const { data: goals, error: goalsError } = await supabase
-            .from('goals')
-            .select('id')
-            .eq('user_id', newSession.user.id)
-            .limit(1);
-            
-          if (goalsError) throw goalsError;
-          
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('coach_style, coach_tone')
-            .eq('id', newSession.user.id)
-            .single();
-            
-          if (profileError && profileError.code !== 'PGRST116') throw profileError;
-          
-          // If the user has no goals and no coach settings, redirect to onboarding
-          const needsOnboarding = (!goals || goals.length === 0) && 
-                                (!profileData || (!profileData.coach_style && !profileData.coach_tone));
-          
-          if (needsOnboarding) {
+          // Simple basic redirection - this path should never cause errors
+          if (location.pathname === '/' || location.pathname === '/auth') {
             navigate('/onboarding');
-          } else {
-            // Only redirect to dashboard if we're not on a specific page already
-            if (location.pathname === '/' || location.pathname === '/auth') {
-              navigate('/dashboard');
-            }
           }
         } catch (error) {
-          console.error("Error checking onboarding status:", error);
-          // If there's an error, it's safer to redirect to onboarding
-          navigate('/onboarding');
-        } finally {
-          setIsLoading(false);
+          console.error("Error handling sign in redirect:", error);
         }
       } else if (event === 'SIGNED_OUT') {
         navigate('/');
@@ -94,40 +73,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name
+          }
         }
+      });
+
+      if (error) {
+        toast.error(error.message);
+        throw error;
       }
-    });
 
-    if (error) {
-      toast.error(error.message);
-      setIsLoading(false);
+      toast.success("Account created! Please check your email for verification.");
+    } catch (error: any) {
+      console.error("Sign up error:", error);
+      toast.error(error.message || "Failed to create account");
       throw error;
+    } finally {
+      setIsLoading(false);
     }
-
-    toast.success("Account created! Please check your email for verification.");
-    setIsLoading(false);
   };
 
   const signIn = async (email: string, password: string) => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
 
-    if (error) {
-      toast.error(error.message);
-      setIsLoading(false);
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Sign in error:", error);
+      toast.error(error.message || "Failed to sign in");
       throw error;
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   const signInWithGoogle = async () => {
@@ -141,22 +131,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
 
       if (error) {
-        setIsLoading(false);
+        toast.error(error.message);
         throw error;
       }
-
-      // No need to set loading to false here as the redirect will happen
     } catch (error: any) {
-      setIsLoading(false);
+      console.error("Google sign in error:", error);
+      toast.error(error.message || "Failed to sign in with Google");
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    
-    if (error) {
-      toast.error(error.message);
+    try {
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        toast.error(error.message);
+        throw error;
+      }
+    } catch (error: any) {
+      console.error("Sign out error:", error);
+      toast.error(error.message || "Failed to sign out");
       throw error;
     }
   };
