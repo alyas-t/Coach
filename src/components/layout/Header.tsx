@@ -17,6 +17,7 @@ const Header = () => {
   const navItems = [
     { name: "Dashboard", path: "/dashboard" },
     { name: "Chat", path: "/chat" },
+    { name: "Calendar", path: "/calendar" },
   ];
 
   useEffect(() => {

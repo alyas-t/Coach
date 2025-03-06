@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import GoalCard from "./GoalCard";
-import ProgressChart from "./ProgressChart";
+import WeeklyProgressChart from "./WeeklyProgressChart";
 import DailyCheckIn from "./DailyCheckIn";
+import UpcomingCheckIns from "./UpcomingCheckIns";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MessageSquare, Loader2, Clock } from "lucide-react";
+import { Plus, Calendar, MessageSquare, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,66 +99,8 @@ const Dashboard = () => {
     setShowAddGoal(false);
   };
 
-  const getUpcomingCheckIns = () => {
-    const currentHour = new Date().getHours();
-    const upcomingCheckIns = [];
-    
-    const morningCheckIn = checkIns.find(c => c.check_in_type === 'morning');
-    const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
-    
-    if (currentHour < 12) {
-      if (!morningCheckIn || !morningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'morning',
-          title: 'Morning Planning',
-          time: 'Today at 8:00 AM',
-          active: true
-        });
-      }
-      
-      upcomingCheckIns.push({
-        id: 'evening',
-        title: 'Evening Reflection',
-        time: 'Today at 8:00 PM',
-        active: false
-      });
-    } 
-    else if (currentHour < 18) {
-      if (!eveningCheckIn || !eveningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'evening',
-          title: 'Evening Reflection',
-          time: 'Today at 8:00 PM',
-          active: true
-        });
-      }
-      
-      upcomingCheckIns.push({
-        id: 'morning',
-        title: 'Morning Planning',
-        time: 'Tomorrow at 8:00 AM',
-        active: false
-      });
-    } 
-    else {
-      if (!eveningCheckIn || !eveningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'evening',
-          title: 'Evening Reflection',
-          time: 'Today at 8:00 PM',
-          active: true
-        });
-      }
-      
-      upcomingCheckIns.push({
-        id: 'morning',
-        title: 'Morning Planning',
-        time: 'Tomorrow at 8:00 AM',
-        active: false
-      });
-    }
-    
-    return upcomingCheckIns;
+  const handleCalendarClick = () => {
+    navigate('/calendar');
   };
 
   if (loading) {
@@ -189,7 +132,12 @@ const Dashboard = () => {
                 <MessageSquare className="h-4 w-4" /> Chat with Coach
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="gap-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1"
+              onClick={handleCalendarClick}
+            >
               <Calendar className="h-4 w-4" /> Calendar
             </Button>
           </div>
@@ -244,67 +192,8 @@ const Dashboard = () => {
       </section>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {goals.length > 0 ? (
-              <ProgressChart data={goals} />
-            ) : (
-              <div className="h-48 flex items-center justify-center">
-                <p className="text-muted-foreground">
-                  No goals to display progress
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Upcoming Check-ins</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {getUpcomingCheckIns().map((checkIn) => (
-                <div
-                  key={checkIn.id}
-                  className={`flex items-center justify-between p-3 border rounded-md ${
-                    checkIn.active ? 'bg-primary/5 border-primary/20' : ''
-                  }`}
-                >
-                  <div>
-                    <p className="font-medium">
-                      {checkIn.title}
-                      {checkIn.active && (
-                        <Badge variant="outline" className="ml-2 text-xs bg-primary/10">
-                          Due soon
-                        </Badge>
-                      )}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {checkIn.time}
-                    </p>
-                  </div>
-                  <Button
-                    variant={checkIn.active ? "default" : "outline"}
-                    size="sm"
-                    className="text-xs h-8 px-3"
-                    onClick={() => {
-                      document.querySelector('[data-section="check-ins"]')?.scrollIntoView({
-                        behavior: 'smooth'
-                      });
-                    }}
-                  >
-                    {checkIn.active ? "Start" : "Reminder"}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <WeeklyProgressChart />
+        <UpcomingCheckIns />
       </div>
 
       <AddGoalDialog 
