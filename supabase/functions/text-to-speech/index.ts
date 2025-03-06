@@ -19,39 +19,58 @@ serve(async (req) => {
       throw new Error('Text is required')
     }
     
-    // Use OpenAI TTS API
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'tts-1',
-        input: text,
-        voice: voice || 'alloy', // Default voice
-        response_format: 'mp3',
-      }),
-    })
+    console.log("Processing TTS request for text:", text.substring(0, 50) + "...");
+    console.log("Using voice:", voice || "default");
     
-    if (!response.ok) {
-      const error = await response.json()
-      console.error('OpenAI API error:', error)
-      throw new Error(error.error?.message || 'Failed to generate speech')
+    // Use ElevenLabs TTS API with the provided API key
+    const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
+    if (!elevenLabsApiKey) {
+      throw new Error('ELEVENLABS_API_KEY is not configured');
     }
     
+    // Voice ID mapping - default to "Rachel" voice if not specified
+    // Rachel is a female voice with a neutral accent (Voice ID: 21m00Tcm4TlvDq8ikWAM)
+    const voiceId = voice || "21m00Tcm4TlvDq8ikWAM";
+    
+    console.log("Making ElevenLabs API request...");
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': elevenLabsApiKey
+      },
+      body: JSON.stringify({
+        text: text,
+        model_id: "eleven_monolingual_v1",
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.5
+        }
+      }),
+    });
+    
+    if (!response.ok) {
+      console.error("ElevenLabs API error:", response.status, response.statusText);
+      const errorText = await response.text();
+      console.error("Error details:", errorText);
+      throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+    }
+    
+    console.log("Successfully received audio response from ElevenLabs");
+    
     // Get audio data as arrayBuffer and convert to base64
-    const arrayBuffer = await response.arrayBuffer()
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    const arrayBuffer = await response.arrayBuffer();
+    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     
     return new Response(
       JSON.stringify({ audio: base64Audio }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   } catch (error) {
-    console.error('Text-to-speech error:', error)
+    console.error('Text-to-speech error:', error);
     
     return new Response(
       JSON.stringify({ error: error.message }),
@@ -59,6 +78,6 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   }
-})
+});

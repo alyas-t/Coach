@@ -17,7 +17,7 @@ class TextToSpeech {
   private voicePreference: string | null = null;
   private useEdgeFunction: boolean = true;
   private audio: HTMLAudioElement | null = null;
-  private openAIVoice: string = "alloy"; // Default OpenAI voice
+  private elevenLabsVoice: string = "21m00Tcm4TlvDq8ikWAM"; // Default to Rachel voice
 
   private constructor() {
     if (typeof window !== 'undefined') {
@@ -78,16 +78,26 @@ class TextToSpeech {
     this.selectPreferredVoice();
   }
 
-  public setOpenAIVoice(voice: string): void {
-    this.openAIVoice = voice;
+  public setElevenLabsVoice(voiceId: string): void {
+    this.elevenLabsVoice = voiceId;
   }
 
   public getAvailableVoices(): SpeechSynthesisVoice[] {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
   }
 
-  public getOpenAIVoices(): string[] {
-    return ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
+  public getElevenLabsVoices(): {id: string, name: string}[] {
+    return [
+      { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel (Female)" },
+      { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi (Female)" },
+      { id: "EXAVITQu4vr4xnSDxMaL", name: "Bella (Female)" },
+      { id: "ErXwobaYiN019PkySvjV", name: "Antoni (Male)" },
+      { id: "MF3mGyEYCl7XYWbV9V6O", name: "Elli (Female)" },
+      { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh (Male)" },
+      { id: "VR6AewLTigWG4xSOukaG", name: "Arnold (Male)" },
+      { id: "pNInz6obpgDQGcFmaJgB", name: "Adam (Male)" },
+      { id: "yoZ06aMxZJJ28mfd3POQ", name: "Sam (Male)" }
+    ];
   }
 
   public async speak(text: string, onEnd?: () => void): Promise<void> {
@@ -125,10 +135,12 @@ class TextToSpeech {
 
   private async speakWithEdgeFunction(text: string, onEnd?: () => void): Promise<void> {
     try {
+      toast.info("Generating speech...");
+      
       const { data, error } = await supabase.functions.invoke("text-to-speech", {
         body: { 
           text: text,
-          voice: this.openAIVoice
+          voice: this.elevenLabsVoice
         }
       });
 
@@ -156,7 +168,15 @@ class TextToSpeech {
         };
         
         this.audio.addEventListener('ended', this.handleAudioEnded);
-        await this.audio.play();
+        
+        // Play the audio
+        try {
+          await this.audio.play();
+          toast.dismiss(); // Dismiss the "Generating speech..." toast
+        } catch (playError) {
+          console.error("Error playing audio:", playError);
+          throw playError;
+        }
       } else {
         throw new Error("No audio data received");
       }

@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Loader2, ArrowLeft, ArrowRight, Volume2 } from "lucide-react";
+import { Check, X, Loader2, ArrowLeft, ArrowRight, Volume2, Settings } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -10,6 +11,12 @@ import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TextToSpeech from "@/utils/textToSpeech";
 import VoiceCheckIn from "@/components/ui/voiceCheckIn";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 const DailyCheckIn = () => {
   const [checkIns, setCheckIns] = useState<any[]>([]);
@@ -20,6 +27,7 @@ const DailyCheckIn = () => {
   const { user } = useAuth();
   const tts = TextToSpeech.getInstance();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
   
   useEffect(() => {
     const handleSpeakStart = () => setIsSpeaking(true);
@@ -249,6 +257,12 @@ const DailyCheckIn = () => {
     }));
   };
 
+  const handleVoiceChange = (voiceId: string) => {
+    tts.setElevenLabsVoice(voiceId);
+    toast.success("Voice changed successfully");
+    setVoiceMenuOpen(false);
+  };
+
   const renderCheckInForm = (checkIn: any) => {
     if (checkIn.completed) {
       return (
@@ -273,6 +287,21 @@ const DailyCheckIn = () => {
         <div className="flex justify-between items-center">
           <h4 className="text-lg font-medium">{checkIn.question}</h4>
           <div className="flex gap-2">
+            <DropdownMenu open={voiceMenuOpen} onOpenChange={setVoiceMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-muted-foreground">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <div className="text-sm font-medium px-2 py-1.5 text-muted-foreground">Select Voice</div>
+                {tts.getElevenLabsVoices().map(voice => (
+                  <DropdownMenuItem key={voice.id} onClick={() => handleVoiceChange(voice.id)}>
+                    {voice.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button 
               variant={isSpeaking ? "secondary" : "ghost"} 
               size="sm" 
