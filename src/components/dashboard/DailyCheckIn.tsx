@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -147,9 +148,8 @@ const DailyCheckIn = () => {
         )
       );
       
-      // Trigger a refetch of user's check-ins
-      await checkOnboardingStatus();
-      
+      // Remove the call to the undefined checkOnboardingStatus function
+      // Replacing with a success toast notification
       toast.success("Check-in completed successfully!");
     } catch (error) {
       console.error("Error saving check-in:", error);
