@@ -67,13 +67,19 @@ const Settings = () => {
     }
     
     const loadSettings = async () => {
-      const settings = await getCoachSettings();
-      if (settings) {
-        setCoachStyle(settings.coach_style || "supportive");
-        setCoachTone(settings.coach_tone || "friendly");
-        
-        if (settings.morning_time) setMorningTime(settings.morning_time);
-        if (settings.evening_time) setEveningTime(settings.evening_time);
+      try {
+        const settings = await getCoachSettings();
+        if (settings) {
+          console.log("Loaded settings:", settings);
+          setCoachStyle(settings.coach_style || "supportive");
+          setCoachTone(settings.coach_tone || "friendly");
+          
+          if (settings.morning_time) setMorningTime(settings.morning_time);
+          if (settings.evening_time) setEveningTime(settings.evening_time);
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error);
+        toast.error("Failed to load settings");
       }
     };
     
@@ -82,6 +88,8 @@ const Settings = () => {
   
   const handleSaveCoachSettings = async () => {
     setIsSaving(true);
+    console.log("Saving coach settings:", { coachStyle, coachTone });
+    
     try {
       await saveCoachSettings({
         coachStyle,
@@ -89,6 +97,7 @@ const Settings = () => {
       });
       toast.success("Coach settings saved successfully");
     } catch (error) {
+      console.error("Error in handleSaveCoachSettings:", error);
       toast.error("Failed to save coach settings");
     } finally {
       setIsSaving(false);

@@ -17,9 +17,14 @@ export function useCoachSettings() {
   const [isLoading, setIsLoading] = useState(false);
 
   const saveCoachSettings = async (settings: CoachSettings) => {
-    if (!user) return;
+    if (!user) {
+      console.error("No user found when trying to save coach settings");
+      return;
+    }
     
     setIsLoading(true);
+    console.log("Saving coach settings:", settings);
+    
     try {
       const updateData: any = {
         coach_style: settings.coachStyle,
@@ -31,33 +36,50 @@ export function useCoachSettings() {
       if (settings.eveningTime) updateData.evening_time = settings.eveningTime;
       if (settings.intensity !== undefined) updateData.coach_intensity = settings.intensity;
       
+      console.log("Update data being sent to Supabase:", updateData);
+      
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('id', user.id);
 
-      if (error) throw error;
-      toast.success("Coach settings saved successfully");
+      if (error) {
+        console.error("Supabase error when saving settings:", error);
+        throw error;
+      }
+      
+      console.log("Coach settings saved successfully");
     } catch (error: any) {
       console.error("Error saving coach settings:", error);
       toast.error(error.message || "Failed to save coach settings");
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const getCoachSettings = async () => {
-    if (!user) return null;
+    if (!user) {
+      console.log("No user found when fetching coach settings");
+      return null;
+    }
     
     setIsLoading(true);
     try {
+      console.log("Fetching coach settings for user:", user.id);
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('coach_style, coach_tone, morning_time, evening_time, coach_intensity')
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching coach settings:", error);
+        throw error;
+      }
+      
+      console.log("Coach settings retrieved:", data);
       return data;
     } catch (error: any) {
       console.error("Error fetching coach settings:", error);

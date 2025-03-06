@@ -82,8 +82,8 @@ const UpcomingCheckIns = () => {
       currentHour > eveningHour || 
       (currentHour === eveningHour && currentMinutes >= eveningMinute);
     
-    // Morning Check-in
-    if (!isPastMorningTime || (!morningCheckIn || !morningCheckIn.completed)) {
+    // Morning Check-in - only add if not completed
+    if ((!morningCheckIn || !morningCheckIn.completed) && (!isPastEveningTime)) {
       upcomingCheckIns.push({
         id: 'morning',
         title: 'Morning Planning',
@@ -92,8 +92,8 @@ const UpcomingCheckIns = () => {
       });
     }
     
-    // Evening Check-in
-    if (!isPastEveningTime || (!eveningCheckIn || !eveningCheckIn.completed)) {
+    // Evening Check-in - only add if not completed
+    if ((!eveningCheckIn || !eveningCheckIn.completed)) {
       upcomingCheckIns.push({
         id: 'evening',
         title: 'Evening Reflection',
@@ -103,7 +103,7 @@ const UpcomingCheckIns = () => {
     }
     
     // If both check-ins are completed or time has passed, show next day's morning check-in
-    if (upcomingCheckIns.length === 0 || (isPastEveningTime && eveningCheckIn && eveningCheckIn.completed)) {
+    if (upcomingCheckIns.length === 0) {
       upcomingCheckIns.push({
         id: 'morning',
         title: 'Morning Planning',
