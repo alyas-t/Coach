@@ -1,14 +1,16 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import OnboardingFlow from "@/components/onboarding/OnboardingFlow";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 const Onboarding = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     // If not logged in, redirect to auth page
@@ -20,6 +22,7 @@ const Onboarding = () => {
     // Check if the user has already completed onboarding
     const checkOnboardingStatus = async () => {
       try {
+        setIsChecking(true);
         // Check if the user has any goals set (indicating completed onboarding)
         const { data: goals, error: goalsError } = await supabase
           .from('goals')
@@ -46,6 +49,8 @@ const Onboarding = () => {
         }
       } catch (error) {
         console.error("Error checking onboarding status:", error);
+      } finally {
+        setIsChecking(false);
       }
     };
     
@@ -57,7 +62,14 @@ const Onboarding = () => {
   return (
     <PageTransition>
       <div className="min-h-screen flex items-center justify-center py-16 px-4">
-        <OnboardingFlow />
+        {isChecking ? (
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-muted-foreground">Checking your profile...</p>
+          </div>
+        ) : (
+          <OnboardingFlow />
+        )}
       </div>
     </PageTransition>
   );

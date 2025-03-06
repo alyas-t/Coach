@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { motion } from "framer-motion";
-import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Card, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { ArrowLeft, CheckCircle2, ArrowRight } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import animations from "@/utils/animation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 interface CoachPersonalityFormProps {
   formData: any;
@@ -22,59 +23,67 @@ const CoachPersonalityForm = ({
   onSubmit,
   onPrev,
 }: CoachPersonalityFormProps) => {
-  const [coachStyle, setCoachStyle] = useState<string>(
-    formData.coachStyle || "supportive"
-  );
-  const [coachTone, setCoachTone] = useState<string>(
-    formData.coachTone || "friendly"
-  );
-  const [intensity, setIntensity] = useState<number[]>(
-    formData.intensity ? [formData.intensity] : [3]
-  );
+  const [coachStyle, setCoachStyle] = useState(formData.coachStyle || "supportive");
+  const [coachTone, setCoachTone] = useState(formData.coachTone || "friendly");
+  const [intensity, setIntensity] = useState(formData.intensity || 3);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateFormData({
-      coachStyle,
-      coachTone,
-      intensity: intensity[0],
-    });
+    updateFormData({ coachStyle, coachTone, intensity });
     onSubmit();
   };
 
-  const styles = [
+  const coachStyleOptions = [
     {
-      id: "supportive",
-      name: "Supportive",
-      description: "Focuses on encouragement and positive reinforcement.",
+      value: "supportive",
+      label: "Supportive",
+      description: "Encouraging and positive, focused on building confidence and motivation.",
+      icon: "🤗"
     },
     {
-      id: "directive",
-      name: "Directive",
-      description: "Provides clear instructions and detailed guidance.",
+      value: "directive",
+      label: "Directive",
+      description: "Clear instructions and guidance, telling you exactly what to do.",
+      icon: "📝"
     },
     {
-      id: "challenging",
-      name: "Challenging",
-      description: "Pushes you outside your comfort zone to achieve more.",
+      value: "challenging",
+      label: "Challenging",
+      description: "Pushes you outside your comfort zone to achieve higher goals.",
+      icon: "🔥"
+    },
+    {
+      value: "analytical",
+      label: "Analytical",
+      description: "Data-driven approach focused on measuring and tracking progress.",
+      icon: "📊"
     },
   ];
 
-  const tones = [
+  const coachToneOptions = [
     {
-      id: "friendly",
-      name: "Friendly",
-      description: "Warm, personable, and conversational.",
+      value: "friendly",
+      label: "Friendly",
+      description: "Casual, warm, and approachable communication style.",
+      icon: "😊"
     },
     {
-      id: "professional",
-      name: "Professional",
-      description: "Focused, straightforward, and results-oriented.",
+      value: "professional",
+      label: "Professional",
+      description: "Formal, business-like communication style focused on results.",
+      icon: "👔"
     },
     {
-      id: "motivational",
-      name: "Motivational",
-      description: "Inspirational, passionate, and energetic.",
+      value: "motivational",
+      label: "Motivational",
+      description: "Inspiring and energetic, using powerful language to drive action.",
+      icon: "💪"
+    },
+    {
+      value: "direct",
+      label: "Direct",
+      description: "Straightforward and concise, getting to the point quickly.",
+      icon: "⚡"
     },
   ];
 
@@ -88,98 +97,100 @@ const CoachPersonalityForm = ({
     >
       <motion.div variants={animations.staggerItem}>
         <h2 className="text-2xl font-medium mb-6">Customize Your Coach</h2>
-
+        
         <div className="space-y-6">
-          {/* Coaching Style */}
-          <div className="space-y-3">
-            <Label className="text-base">Coaching Style</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {styles.map((style) => (
-                <Card
-                  key={style.id}
-                  className={`cursor-pointer transition-all duration-200 ${
-                    coachStyle === style.id
-                      ? "border-primary ring-1 ring-primary/30"
-                      : "hover:border-primary/30"
+          <div className="space-y-4">
+            <Label className="text-base">What coaching style do you prefer?</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {coachStyleOptions.map((style) => (
+                <Card 
+                  key={style.value}
+                  className={`cursor-pointer transition-all hover:border-primary ${
+                    coachStyle === style.value ? "border-primary bg-primary/5" : ""
                   }`}
-                  onClick={() => setCoachStyle(style.id)}
+                  onClick={() => setCoachStyle(style.value)}
                 >
-                  <CardContent className="p-4 relative">
-                    {coachStyle === style.id && (
-                      <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-0.5">
-                        <Check className="h-3 w-3" />
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-2xl mb-2">{style.icon}</div>
+                        <h3 className="font-medium">{style.label}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">{style.description}</p>
                       </div>
-                    )}
-                    <h3 className="font-medium mb-1">{style.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {style.description}
-                    </p>
+                      {coachStyle === style.value && (
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
 
-          {/* Communication Tone */}
-          <div className="space-y-3">
-            <Label className="text-base">Communication Tone</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {tones.map((tone) => (
-                <Card
-                  key={tone.id}
-                  className={`cursor-pointer transition-all duration-200 ${
-                    coachTone === tone.id
-                      ? "border-primary ring-1 ring-primary/30"
-                      : "hover:border-primary/30"
+          <div className="space-y-4 pt-4">
+            <Label className="text-base">What tone of voice would you prefer?</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {coachToneOptions.map((tone) => (
+                <Card 
+                  key={tone.value}
+                  className={`cursor-pointer transition-all hover:border-primary ${
+                    coachTone === tone.value ? "border-primary bg-primary/5" : ""
                   }`}
-                  onClick={() => setCoachTone(tone.id)}
+                  onClick={() => setCoachTone(tone.value)}
                 >
-                  <CardContent className="p-4 relative">
-                    {coachTone === tone.id && (
-                      <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-0.5">
-                        <Check className="h-3 w-3" />
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-2xl mb-2">{tone.icon}</div>
+                        <h3 className="font-medium">{tone.label}</h3>
+                        <p className="text-sm text-muted-foreground mt-1">{tone.description}</p>
                       </div>
-                    )}
-                    <h3 className="font-medium mb-1">{tone.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {tone.description}
-                    </p>
+                      {coachTone === tone.value && (
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
             </div>
           </div>
 
-          {/* Coaching Intensity */}
-          <div className="space-y-3">
-            <Label className="text-base">Coaching Intensity</Label>
-            <div className="px-2">
-              <Slider
-                value={intensity}
-                onValueChange={setIntensity}
-                max={5}
-                step={1}
-                className="my-6"
-              />
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Gentle</span>
-                <span>Balanced</span>
-                <span>Intense</span>
-              </div>
+          <div className="space-y-4 pt-4">
+            <div className="flex justify-between items-center">
+              <Label className="text-base">Coaching Intensity</Label>
+              <Badge variant="outline" className="font-normal">
+                {intensity === 1 ? "Very Gentle" : 
+                 intensity === 2 ? "Gentle" : 
+                 intensity === 3 ? "Balanced" : 
+                 intensity === 4 ? "Firm" : "Very Firm"}
+              </Badge>
+            </div>
+            <Slider
+              value={[intensity]}
+              min={1}
+              max={5}
+              step={1}
+              onValueChange={(value) => setIntensity(value[0])}
+              className="py-4"
+            />
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Gentle Support</span>
+              <span>Balanced</span>
+              <span>Strong Push</span>
             </div>
           </div>
         </div>
       </motion.div>
 
-      <motion.div
-        variants={animations.staggerItem}
-        className="pt-4 flex justify-between"
-      >
+      <motion.div variants={animations.staggerItem} className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        <Button type="submit" className="gap-1">
-          Get Started <ChevronRight className="h-4 w-4" />
+        <Button
+          type="submit"
+          className="gap-1"
+        >
+          Complete Setup <ArrowRight className="h-4 w-4" />
         </Button>
       </motion.div>
     </motion.form>
