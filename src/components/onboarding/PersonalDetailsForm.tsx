@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { motion } from "@/utils/animation";
+import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
+import animations from "@/utils/animation";
 
 interface PersonalDetailsFormProps {
   formData: any;
@@ -55,11 +56,11 @@ const PersonalDetailsForm = ({
     <motion.form
       onSubmit={handleSubmit}
       className="space-y-6"
-      variants={motion.staggerContainer}
+      variants={animations.staggerContainer}
       initial="hidden"
       animate="show"
     >
-      <motion.div variants={motion.staggerItem}>
+      <motion.div variants={animations.staggerItem}>
         <h2 className="text-2xl font-medium mb-6">Tell us about yourself</h2>
         
         <div className="space-y-4">
@@ -92,7 +93,7 @@ const PersonalDetailsForm = ({
         </div>
       </motion.div>
 
-      <motion.div variants={motion.staggerItem} className="space-y-3">
+      <motion.div variants={animations.staggerItem} className="space-y-3">
         <Label>What areas would you like to focus on?</Label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {focusAreaOptions.map((area) => (
@@ -118,7 +119,7 @@ const PersonalDetailsForm = ({
         )}
       </motion.div>
 
-      <motion.div variants={motion.staggerItem} className="pt-4 flex justify-end">
+      <motion.div variants={animations.staggerItem} className="pt-4 flex justify-end">
         <Button
           type="submit"
           disabled={!isFormValid}

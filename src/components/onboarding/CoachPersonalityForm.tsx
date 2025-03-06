@@ -2,11 +2,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { motion } from "@/utils/animation";
+import { motion } from "framer-motion";
 import { ArrowLeft, Check, ChevronRight } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import animations from "@/utils/animation";
 
 interface CoachPersonalityFormProps {
   formData: any;
@@ -81,11 +82,11 @@ const CoachPersonalityForm = ({
     <motion.form
       onSubmit={handleSubmit}
       className="space-y-6"
-      variants={motion.staggerContainer}
+      variants={animations.staggerContainer}
       initial="hidden"
       animate="show"
     >
-      <motion.div variants={motion.staggerItem}>
+      <motion.div variants={animations.staggerItem}>
         <h2 className="text-2xl font-medium mb-6">Customize Your Coach</h2>
 
         <div className="space-y-6">
@@ -171,7 +172,7 @@ const CoachPersonalityForm = ({
       </motion.div>
 
       <motion.div
-        variants={motion.staggerItem}
+        variants={animations.staggerItem}
         className="pt-4 flex justify-between"
       >
         <Button type="button" variant="outline" onClick={onPrev}>

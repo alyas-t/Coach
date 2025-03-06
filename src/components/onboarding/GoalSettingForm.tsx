@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { motion } from "@/utils/animation";
+import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Plus, Trash2, List } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import animations from "@/utils/animation";
 
 interface GoalSettingFormProps {
   formData: any;
@@ -110,11 +111,11 @@ const GoalSettingForm = ({
     <motion.form
       onSubmit={handleSubmit}
       className="space-y-6"
-      variants={motion.staggerContainer}
+      variants={animations.staggerContainer}
       initial="hidden"
       animate="show"
     >
-      <motion.div variants={motion.staggerItem}>
+      <motion.div variants={animations.staggerItem}>
         <h2 className="text-2xl font-medium mb-6">Set your goals</h2>
         
         <div className="flex flex-col md:flex-row gap-6">
@@ -269,7 +270,7 @@ const GoalSettingForm = ({
         </div>
       </motion.div>
 
-      <motion.div variants={motion.staggerItem} className="pt-4 flex justify-between">
+      <motion.div variants={animations.staggerItem} className="pt-4 flex justify-between">
         <Button type="button" variant="outline" onClick={onPrev}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>

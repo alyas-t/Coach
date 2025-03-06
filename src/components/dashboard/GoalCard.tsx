@@ -67,8 +67,7 @@ const GoalCard = ({ goal, updateProgress }: GoalCardProps) => {
           </div>
           <Progress
             value={goal.progress * 100}
-            className="h-2"
-            indicatorClassName={getProgressColor(goal.progress)}
+            className={`h-2 ${getProgressColor(goal.progress)}`}
           />
         </div>
       </CardContent>

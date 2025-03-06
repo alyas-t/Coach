@@ -82,3 +82,15 @@ export const scaleAnimation = {
 
 // Export the motion component for easy access
 export { motion };
+
+// Create an animation utilities object for easy access in components
+const animations = {
+  staggerContainer,
+  staggerItem,
+  slideUp,
+  fadeIn,
+  scaleAnimation,
+  pageVariants
+};
+
+export default animations;

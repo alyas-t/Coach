@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import PersonalDetailsForm from "./PersonalDetailsForm";
 import GoalSettingForm from "./GoalSettingForm";
 import CoachPersonalityForm from "./CoachPersonalityForm";
-import { slideUp } from "@/utils/animation";
+import animations from "@/utils/animation";
 import { CheckIcon } from "lucide-react";
 
 const steps = [
