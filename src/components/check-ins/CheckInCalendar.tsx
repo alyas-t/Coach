@@ -7,11 +7,14 @@ import { useCheckIns } from "@/hooks/useCheckIns";
 
 const CheckInCalendar = () => {
   const [date, setDate] = useState<Date>(new Date());
-  const { checkIns, isLoading } = useCheckIns(format(date, 'yyyy-MM'));
+  const checkInsQuery = useCheckIns(format(date, 'yyyy-MM'));
+  const { data: checkIns, isLoading } = checkInsQuery;
 
   const getDayStatus = (day: Date) => {
+    if (!checkIns) return undefined;
+    
     const dateStr = format(day, 'yyyy-MM-dd');
-    const dayCheckIns = checkIns?.filter(c => c.check_in_date === dateStr);
+    const dayCheckIns = checkIns.filter(c => c.check_in_date === dateStr);
     
     if (!dayCheckIns?.length) return undefined;
     
@@ -31,22 +34,28 @@ const CheckInCalendar = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Calendar
-          mode="single"
-          selected={date}
-          onSelect={(date) => date && setDate(date)}
-          className="p-0"
-          modifiers={{
-            completed: (date) => getDayStatus(date) === "completed",
-            partial: (date) => getDayStatus(date) === "partial",
-            pending: (date) => getDayStatus(date) === "pending",
-          }}
-          modifiersClassNames={{
-            completed: "bg-green-100 text-green-900 hover:bg-green-200",
-            partial: "bg-yellow-100 text-yellow-900 hover:bg-yellow-200",
-            pending: "bg-blue-100 text-blue-900 hover:bg-blue-200",
-          }}
-        />
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={(date) => date && setDate(date)}
+            className="p-0"
+            modifiers={{
+              completed: (date) => getDayStatus(date) === "completed",
+              partial: (date) => getDayStatus(date) === "partial",
+              pending: (date) => getDayStatus(date) === "pending",
+            }}
+            modifiersClassNames={{
+              completed: "bg-green-100 text-green-900 hover:bg-green-200",
+              partial: "bg-yellow-100 text-yellow-900 hover:bg-yellow-200",
+              pending: "bg-blue-100 text-blue-900 hover:bg-blue-200",
+            }}
+          />
+        )}
       </CardContent>
     </Card>
   );
