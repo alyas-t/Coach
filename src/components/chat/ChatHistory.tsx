@@ -18,14 +18,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Calendar, MessageSquare } from "lucide-react";
+import { Loader2, Calendar, MessageSquare, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 const ChatHistory = ({ onClose }) => {
   const [loading, setLoading] = useState(true);
-  const [chatDays, setChatDays] = useState([]);
-  const [selectedDay, setSelectedDay] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [error, setError] = useState<string | null>(null);
+  const [chatDays, setChatDays] = useState<string[]>([]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -33,6 +35,7 @@ const ChatHistory = ({ onClose }) => {
 
     const fetchChatDays = async () => {
       setLoading(true);
+      setError(null);
       
       try {
         const { data, error } = await supabase
@@ -44,15 +47,19 @@ const ChatHistory = ({ onClose }) => {
         if (error) throw error;
 
         // Group by date (ignoring time)
-        const days = new Set();
-        data.forEach(message => {
-          const date = new Date(message.created_at).toISOString().split('T')[0];
-          days.add(date);
-        });
-
-        setChatDays(Array.from(days));
-      } catch (error) {
+        const days = new Set<string>();
+        if (data && data.length > 0) {
+          data.forEach(message => {
+            const date = new Date(message.created_at).toISOString().split('T')[0];
+            days.add(date);
+          });
+          setChatDays(Array.from(days));
+        } else {
+          setChatDays([]);
+        }
+      } catch (error: any) {
         console.error("Error fetching chat days:", error);
+        setError(error.message || "Failed to load chat history");
       } finally {
         setLoading(false);
       }
@@ -61,9 +68,10 @@ const ChatHistory = ({ onClose }) => {
     fetchChatDays();
   }, [user]);
 
-  const handleDaySelect = async (day) => {
+  const handleDaySelect = async (day: string) => {
     setSelectedDay(day);
     setLoading(true);
+    setError(null);
 
     try {
       // Convert the selected day to timestamp ranges
@@ -80,11 +88,56 @@ const ChatHistory = ({ onClose }) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data);
-    } catch (error) {
+      setMessages(data || []);
+    } catch (error: any) {
       console.error("Error fetching messages for day:", error);
+      setError(error.message || "Failed to load messages for this day");
+      setMessages([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = () => {
+    if (selectedDay) {
+      handleDaySelect(selectedDay);
+    } else {
+      // Fetch chat days again
+      setChatDays([]);
+      setError(null);
+      setLoading(true);
+      
+      const fetchChatDays = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('chat_messages')
+            .select('created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+
+          // Group by date (ignoring time)
+          const days = new Set<string>();
+          if (data && data.length > 0) {
+            data.forEach(message => {
+              const date = new Date(message.created_at).toISOString().split('T')[0];
+              days.add(date);
+            });
+            setChatDays(Array.from(days));
+          } else {
+            setChatDays([]);
+          }
+        } catch (error: any) {
+          console.error("Error retrying chat days fetch:", error);
+          setError(error.message || "Failed to load chat history");
+          toast.error("Failed to load chat history");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchChatDays();
     }
   };
 
@@ -101,13 +154,31 @@ const ChatHistory = ({ onClose }) => {
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden">
           {/* Calendar/Days List */}
           <Card className="md:col-span-1 h-full">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base">Chat Days</CardTitle>
+              {loading ? null : (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleRetry}
+                  title="Refresh chat days"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {loading && !selectedDay ? (
                 <div className="flex justify-center items-center h-40">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : error && !selectedDay ? (
+                <div className="p-4 text-center">
+                  <p className="text-sm text-destructive mb-2">{error}</p>
+                  <Button variant="outline" size="sm" onClick={handleRetry}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
                 </div>
               ) : (
                 <ScrollArea className="h-[60vh]">
@@ -151,6 +222,14 @@ const ChatHistory = ({ onClose }) => {
                     loading ? (
                       <div className="flex justify-center items-center h-40">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : error ? (
+                      <div className="flex flex-col items-center justify-center py-8">
+                        <p className="text-sm text-destructive mb-4">{error}</p>
+                        <Button variant="outline" size="sm" onClick={handleRetry}>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry
+                        </Button>
                       </div>
                     ) : messages.length > 0 ? (
                       <div className="space-y-4">

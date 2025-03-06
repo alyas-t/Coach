@@ -91,34 +91,67 @@ serve(async (req) => {
 
     console.log("Sending request to Perplexity API");
     
-    // Call Perplexity API
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-sonar-small-128k-online",
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 500,
-        top_p: 0.9,
-        frequency_penalty: 0.5,
-        presence_penalty: 0.5
-      }),
-    });
+    // Call Perplexity API with retry logic
+    let response;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries <= maxRetries) {
+      try {
+        response = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "llama-3.1-sonar-small-128k-online",
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 500,
+            top_p: 0.9,
+            frequency_penalty: 0.5,
+            presence_penalty: 0.5
+          }),
+        });
+        
+        // If response is OK, break from retry loop
+        if (response.ok) break;
+        
+        // If we got rate limited, wait and retry
+        if (response.status === 429) {
+          const waitTime = (retries + 1) * 1000; // Exponential backoff
+          console.log(`Rate limited, retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          retries++;
+          continue;
+        }
+        
+        // For other errors, throw to be caught by outer catch
+        const errorText = await response.text();
+        throw new Error(`Perplexity API error: ${response.status} - ${errorText}`);
+      } catch (error) {
+        if (retries >= maxRetries) throw error;
+        console.error(`Attempt ${retries + 1} failed:`, error);
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("Perplexity API error:", errorData);
-      throw new Error(`Perplexity API error: ${response.status} - ${errorData}`);
+    if (!response || !response.ok) {
+      throw new Error(`Failed to get response from Perplexity API after ${maxRetries} retries`);
     }
 
     const data = await response.json();
     console.log("Perplexity API response received");
     
-    const generatedText = data.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response.";
+    // Ensure we got a valid response with content
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      console.error("Invalid response format from API:", JSON.stringify(data));
+      throw new Error("Invalid response format from Perplexity API");
+    }
+    
+    const generatedText = data.choices[0].message.content;
     
     return new Response(
       JSON.stringify({ response: generatedText }),
@@ -128,10 +161,14 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error processing chat request:", error);
     
+    // Provide a friendly error message to the client
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        response: "I'm having trouble connecting to my knowledge base right now. Please try again in a moment."
+      }),
       {
-        status: 500,
+        status: 200, // Return 200 even on error so the UI can display the fallback message
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

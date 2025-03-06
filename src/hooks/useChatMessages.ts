@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -211,15 +212,27 @@ export function useChatMessages() {
         throw error;
       }
       
+      // If we have an error message in the response but the response was successful
+      if (data?.error) {
+        console.error("Error from Perplexity API:", data.error);
+        // If we have a fallback response, use it
+        if (data?.response) {
+          console.log("Using fallback response");
+          return data.response;
+        }
+        throw new Error(data.error);
+      }
+      
       if (!data || !data.response) {
         console.error("Invalid response from Perplexity API:", data);
         throw new Error("Invalid response from AI service");
       }
       
-      return data.response || "I'm sorry, I couldn't generate a response.";
+      return data.response;
+      
     } catch (error) {
       console.error('Error generating coach response:', error);
-      return "I'm having trouble connecting right now. Please try again later.";
+      return "I'm having trouble connecting right now. Please try again in a moment.";
     }
   };
 
@@ -268,17 +281,19 @@ export function useChatMessages() {
       
       // Extract unique dates (YYYY-MM-DD format)
       const uniqueDates = new Set<string>();
-      data?.forEach(msg => {
-        const dateOnly = new Date(msg.created_at).toISOString().split('T')[0];
-        uniqueDates.add(dateOnly);
-      });
+      
+      if (data && data.length > 0) {
+        data.forEach(msg => {
+          const dateOnly = new Date(msg.created_at).toISOString().split('T')[0];
+          uniqueDates.add(dateOnly);
+        });
+      }
       
       console.log("Retrieved unique chat days:", Array.from(uniqueDates));
       return Array.from(uniqueDates);
     } catch (error) {
       console.error('Error getting chat days:', error);
-      toast.error('Failed to load chat history dates');
-      return [];
+      throw error; // Let the component handle this error
     }
   };
   

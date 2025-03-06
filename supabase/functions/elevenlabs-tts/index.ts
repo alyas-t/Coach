@@ -39,29 +39,58 @@ serve(async (req) => {
 
     console.log(`Generating speech for text: "${text.substring(0, 50)}..." using voice: ${voice}`);
     
-    // Call ElevenLabs API
-    const response = await fetch(`${API_URL}/${voice}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "xi-api-key": ELEVENLABS_API_KEY,
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: ttsModel,
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.0,
-          use_speaker_boost: true
+    // Call ElevenLabs API with retry logic
+    let response;
+    let retries = 0;
+    const maxRetries = 2;
+    
+    while (retries <= maxRetries) {
+      try {
+        response = await fetch(`${API_URL}/${voice}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": ELEVENLABS_API_KEY,
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: ttsModel,
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75,
+              style: 0.0,
+              use_speaker_boost: true
+            }
+          }),
+        });
+        
+        // If response is OK, break from retry loop
+        if (response.ok) break;
+        
+        // If we got rate limited, wait and retry
+        if (response.status === 429) {
+          const waitTime = (retries + 1) * 1000; // Exponential backoff
+          console.log(`Rate limited, retrying in ${waitTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          retries++;
+          continue;
         }
-      }),
-    });
+        
+        // For other errors, throw to be caught by outer catch
+        const errorText = await response.text();
+        throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+      } catch (error) {
+        if (retries >= maxRetries) throw error;
+        console.error(`Attempt ${retries + 1} failed:`, error);
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
 
-    if (!response.ok) {
+    if (!response || !response.ok) {
       const errorData = await response.text();
       console.error("ElevenLabs API error:", errorData);
-      throw new Error(`ElevenLabs API error: ${response.status} - ${errorData}`);
+      throw new Error(`ElevenLabs API error: ${response?.status || 'Unknown'} - ${errorData || 'Unknown error'}`);
     }
 
     // Get audio data as arrayBuffer
@@ -90,9 +119,12 @@ serve(async (req) => {
     console.error("Error processing TTS request:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
+      }),
       {
-        status: 500,
+        status: 200, // Return 200 even on error so UI can handle it gracefully
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
