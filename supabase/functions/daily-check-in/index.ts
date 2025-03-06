@@ -20,8 +20,9 @@ serve(async (req) => {
 
   try {
     const { type = "morning" } = await req.json();
-    const checkInType = type === "evening" ? "evening" : "morning";
-    
+    const isEvening = type === "evening";
+    const checkInType = isEvening ? "evening" : "morning";
+
     // Get all users with their profiles
     const { data: usersData, error: usersError } = await supabase
       .from('profiles')
@@ -31,7 +32,7 @@ serve(async (req) => {
       throw usersError;
     }
 
-    // Get today's goals and check-ins
+    // Get today's date
     const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
     const processedUsers = [];
@@ -44,17 +45,6 @@ serve(async (req) => {
 
       // Skip if no email
       if (!userEmail) continue;
-
-      // Get user's pending goals
-      const { data: goals, error: goalsError } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (goalsError) {
-        console.error(`Error fetching goals for user ${userId}:`, goalsError);
-        continue;
-      }
 
       // Check if user already has a check-in of this type today
       const { data: checkIns, error: checkInsError } = await supabase
@@ -71,8 +61,8 @@ serve(async (req) => {
 
       // If user doesn't have a check-in of this type today, create one
       if (checkIns.length === 0) {
-        // Create a check-in with a personalized question based on type
-        const question = checkInType === "evening"
+        // Create a question based on the check-in type
+        const question = isEvening 
           ? "How did you do with your goals today? What went well, and what could have gone better?"
           : "How are you feeling about your goals today?";
         
@@ -91,9 +81,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Send email to user
-        // In a real app, you would use an email service like Resend here
-        console.log(`Would send ${checkInType} check-in email to ${userEmail} with subject "${checkInType === 'morning' ? 'Morning Check-in' : 'Evening Reflection'}"`);
+        // Send email to user (in a real app, you would use an email service here)
+        console.log(`Would send ${checkInType} check-in email to ${userEmail}`);
         console.log(`Email content: Hello ${userName}, it's time for your ${checkInType} check-in!`);
         
         processedUsers.push({
@@ -113,13 +102,14 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
+      checkInType,
       message: `Processed ${processedUsers.length} users for ${checkInType} check-ins`,
       details: processedUsers
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error("Error processing daily emails:", error);
+    console.error(`Error processing ${req.method} request:`, error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

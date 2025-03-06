@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import GoalCard from "./GoalCard";
 import ProgressChart from "./ProgressChart";
 import DailyCheckIn from "./DailyCheckIn";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MessageSquare, Loader2 } from "lucide-react";
+import { Plus, Calendar, MessageSquare, Loader2, Clock } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +18,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [checkIns, setCheckIns] = useState<any[]>([]);
   
   const { user } = useAuth();
   const { getGoals, updateGoalProgress } = useGoals();
@@ -46,6 +46,16 @@ const Dashboard = () => {
         
         const profileData = await getProfile();
         setProfile(profileData);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const { data: checkInsData, error } = await supabase
+          .from('check_ins')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('check_in_date', today);
+          
+        if (error) throw error;
+        setCheckIns(checkInsData || []);
       } catch (error) {
         console.error("Error loading dashboard data:", error);
       } finally {
@@ -60,14 +70,12 @@ const Dashboard = () => {
     try {
       await updateGoalProgress(id, progress);
       
-      // Update goals state
       setGoals(prev => 
         prev.map(goal => 
           goal.id === id 
             ? { 
                 ...goal, 
                 progress, 
-                // If marking as complete, update streak and days_completed
                 ...(progress === 1 && goal.progress < 1 
                   ? { 
                       streak: (goal.streak || 0) + 1, 
@@ -87,6 +95,68 @@ const Dashboard = () => {
   const handleAddGoal = (newGoal: any) => {
     setGoals(prev => [...prev, newGoal]);
     setShowAddGoal(false);
+  };
+
+  const getUpcomingCheckIns = () => {
+    const currentHour = new Date().getHours();
+    const upcomingCheckIns = [];
+    
+    const morningCheckIn = checkIns.find(c => c.check_in_type === 'morning');
+    const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
+    
+    if (currentHour < 12) {
+      if (!morningCheckIn || !morningCheckIn.completed) {
+        upcomingCheckIns.push({
+          id: 'morning',
+          title: 'Morning Planning',
+          time: 'Today at 8:00 AM',
+          active: true
+        });
+      }
+      
+      upcomingCheckIns.push({
+        id: 'evening',
+        title: 'Evening Reflection',
+        time: 'Today at 8:00 PM',
+        active: false
+      });
+    } 
+    else if (currentHour < 18) {
+      if (!eveningCheckIn || !eveningCheckIn.completed) {
+        upcomingCheckIns.push({
+          id: 'evening',
+          title: 'Evening Reflection',
+          time: 'Today at 8:00 PM',
+          active: true
+        });
+      }
+      
+      upcomingCheckIns.push({
+        id: 'morning',
+        title: 'Morning Planning',
+        time: 'Tomorrow at 8:00 AM',
+        active: false
+      });
+    } 
+    else {
+      if (!eveningCheckIn || !eveningCheckIn.completed) {
+        upcomingCheckIns.push({
+          id: 'evening',
+          title: 'Evening Reflection',
+          time: 'Today at 8:00 PM',
+          active: true
+        });
+      }
+      
+      upcomingCheckIns.push({
+        id: 'morning',
+        title: 'Morning Planning',
+        time: 'Tomorrow at 8:00 AM',
+        active: false
+      });
+    }
+    
+    return upcomingCheckIns;
   };
 
   if (loading) {
@@ -191,32 +261,43 @@ const Dashboard = () => {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle>Upcoming Check-ins</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[1, 2].map((i) => (
+              {getUpcomingCheckIns().map((checkIn) => (
                 <div
-                  key={i}
-                  className="flex items-center justify-between p-3 border rounded-md"
+                  key={checkIn.id}
+                  className={`flex items-center justify-between p-3 border rounded-md ${
+                    checkIn.active ? 'bg-primary/5 border-primary/20' : ''
+                  }`}
                 >
                   <div>
                     <p className="font-medium">
-                      {i === 1 ? "Evening Reflection" : "Morning Planning"}
+                      {checkIn.title}
+                      {checkIn.active && (
+                        <Badge variant="outline" className="ml-2 text-xs bg-primary/10">
+                          Due soon
+                        </Badge>
+                      )}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {i === 1
-                        ? "Today at 8:00 PM"
-                        : "Tomorrow at 8:00 AM"}
+                      {checkIn.time}
                     </p>
                   </div>
                   <Button
-                    variant="outline"
+                    variant={checkIn.active ? "default" : "outline"}
                     size="sm"
                     className="text-xs h-8 px-3"
+                    onClick={() => {
+                      document.querySelector('[data-section="check-ins"]')?.scrollIntoView({
+                        behavior: 'smooth'
+                      });
+                    }}
                   >
-                    {i === 1 ? "Start" : "Reminder"}
+                    {checkIn.active ? "Start" : "Reminder"}
                   </Button>
                 </div>
               ))}
@@ -225,7 +306,6 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Add Goal Dialog */}
       <AddGoalDialog 
         open={showAddGoal} 
         onOpenChange={setShowAddGoal}
