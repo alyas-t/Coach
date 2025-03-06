@@ -82,29 +82,39 @@ const DailyCheckIn = () => {
             setActiveTab('morning');
           }
         } else {
-          // Create a new morning check-in for today if none exists
-          const defaultQuestion = "How are you feeling about your goals today?";
-          const { data: newCheckIn, error: insertError } = await supabase
-            .from('check_ins')
-            .insert({
+          // Create both morning and evening check-ins
+          const checkInsToCreate = [
+            {
               user_id: user.id,
-              question: defaultQuestion,
+              question: "How are you feeling about your goals today?",
               check_in_date: today,
-              completed: false
-            })
-            .select()
-            .single();
+              completed: false,
+              check_in_type: "morning"
+            },
+            {
+              user_id: user.id,
+              question: "How did you do with your goals today?",
+              check_in_date: today,
+              completed: false,
+              check_in_type: "evening"
+            }
+          ];
+          
+          const { data: newCheckIns, error: insertError } = await supabase
+            .from('check_ins')
+            .insert(checkInsToCreate)
+            .select();
           
           if (insertError) throw insertError;
           
-          // Add the inferred type
-          const checkInWithType = {
-            ...newCheckIn,
-            check_in_type: "morning"
-          };
+          // Initialize responses for new check-ins
+          const initialResponses: Record<string, string> = {};
+          newCheckIns.forEach((checkIn: any) => {
+            initialResponses[checkIn.id] = '';
+          });
           
-          setCheckIns([checkInWithType]);
-          setResponses({ [newCheckIn.id]: '' });
+          setCheckIns(newCheckIns);
+          setResponses(initialResponses);
         }
       } catch (error) {
         console.error("Error fetching check-ins:", error);
@@ -126,6 +136,7 @@ const DailyCheckIn = () => {
       
       if (!response) {
         toast.error("Please provide a response before completing");
+        setIsSaving(false);
         return;
       }
       
@@ -148,9 +159,15 @@ const DailyCheckIn = () => {
         )
       );
       
-      // Remove the call to the undefined checkOnboardingStatus function
-      // Replacing with a success toast notification
       toast.success("Check-in completed successfully!");
+      
+      // If we completed a morning check-in, switch to evening tab if it exists
+      if (checkIn.check_in_type === 'morning') {
+        const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
+        if (eveningCheckIn && !eveningCheckIn.completed) {
+          setActiveTab('evening');
+        }
+      }
     } catch (error) {
       console.error("Error saving check-in:", error);
       toast.error("Failed to save your check-in");
@@ -182,6 +199,14 @@ const DailyCheckIn = () => {
         )
       );
       toast.success("Check-in skipped");
+      
+      // If we skipped a morning check-in, switch to evening tab if it exists
+      if (checkIn.check_in_type === 'morning') {
+        const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
+        if (eveningCheckIn && !eveningCheckIn.completed) {
+          setActiveTab('evening');
+        }
+      }
     } catch (error) {
       console.error("Error skipping check-in:", error);
       toast.error("Failed to skip your check-in");
@@ -207,6 +232,9 @@ const DailyCheckIn = () => {
         <div className="p-6 text-center bg-muted/20 rounded-lg">
           <p className="text-muted-foreground">
             You've already completed your {checkIn.check_in_type} check-in for today.
+          </p>
+          <p className="mt-4 p-4 bg-muted/10 rounded border border-border text-sm">
+            "{checkIn.response}"
           </p>
         </div>
       );
