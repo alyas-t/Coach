@@ -11,6 +11,16 @@ export interface Message {
   timestamp: Date;
 }
 
+// Define the database response type explicitly
+interface ChatMessageRow {
+  id: string;
+  content: string;
+  sender: string;
+  created_at: string;
+  user_id: string;
+  chat_date?: string;
+}
+
 export function useChatMessages() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +32,7 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
@@ -31,7 +41,8 @@ export function useChatMessages() {
       
       if (error) throw error;
       
-      return data.map((message: any) => ({
+      // Explicitly type the response to avoid deep type instantiation
+      return (data as ChatMessageRow[]).map(message => ({
         id: message.id,
         content: message.content,
         sender: message.sender as "user" | "coach",
@@ -56,8 +67,9 @@ export function useChatMessages() {
       
       if (error) throw error;
       
-      // Extract unique dates
-      const uniqueDates = [...new Set(data.map((item: any) => item.chat_date))];
+      // Extract unique dates with explicit typing
+      const typedData = data as { chat_date: string }[];
+      const uniqueDates = [...new Set(typedData.map(item => item.chat_date))];
       return uniqueDates;
     } catch (error: any) {
       console.error("Error fetching chat days:", error);
@@ -86,11 +98,13 @@ export function useChatMessages() {
       
       if (error) throw error;
       
+      // Explicitly type the response
+      const typedData = data as ChatMessageRow;
       return {
-        id: data.id,
-        content: data.content,
-        sender: data.sender as "user" | "coach",
-        timestamp: new Date(data.created_at)
+        id: typedData.id,
+        content: typedData.content,
+        sender: typedData.sender as "user" | "coach",
+        timestamp: new Date(typedData.created_at)
       };
     } catch (error: any) {
       console.error("Error sending message:", error);
