@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
@@ -210,9 +209,9 @@ const ChatInterface = () => {
         <VoiceChatModal 
           isOpen={isVoiceChatOpen} 
           onClose={() => setIsVoiceChatOpen(false)} 
-          onSendMessage={(text) => {
+          onSendMessage={async (text) => {
             setInputText(text);
-            handleSendMessage();
+            await handleSendMessage();
           }}
         />
       )}

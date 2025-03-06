@@ -57,7 +57,7 @@ export function useUserPreferences() {
           focusAreas: focusAreas || [],
           coachStyle: coachSettings?.coachStyle || "supportive",
           coachTone: coachSettings?.coachTone || "friendly",
-          voiceEnabled: textToSpeech.getEnabled(),
+          voiceEnabled: textToSpeech.isEnabled(),
           loaded: true
         });
       } catch (error) {
