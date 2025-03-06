@@ -11,10 +11,6 @@ class TextToSpeech {
   private onSpeakStartCallbacks: Array<() => void> = [];
   private onSpeakEndCallbacks: Array<() => void> = [];
   private voicePreference: string | null = null;
-  private voiceCharacteristics: {
-    gender?: 'male' | 'female';
-    style?: 'supportive' | 'motivational' | 'professional';
-  } = {};
 
   private constructor() {
     this.speechSynthesis = window.speechSynthesis;
@@ -40,29 +36,11 @@ class TextToSpeech {
 
   private selectPreferredVoice(): void {
     // Try to select a preferred English voice based on user preference or defaults
-    let preferVoiceNames: string[] = [];
+    let preferVoiceNames = ['Samantha', 'Google UK English Female', 'Microsoft Zira', 'Female'];
     
     // If user has a specific voice preference, prioritize it
     if (this.voicePreference) {
-      preferVoiceNames.push(this.voicePreference);
-    } else {
-      // Otherwise use characteristics to select an appropriate voice
-      if (this.voiceCharacteristics.style === 'supportive') {
-        preferVoiceNames = this.voiceCharacteristics.gender === 'male' 
-          ? ['Google UK English Male', 'Microsoft David'] 
-          : ['Samantha', 'Google UK English Female', 'Microsoft Zira'];
-      } else if (this.voiceCharacteristics.style === 'motivational') {
-        preferVoiceNames = this.voiceCharacteristics.gender === 'male'
-          ? ['Alex', 'Microsoft David', 'Google US English']
-          : ['Karen', 'Victoria', 'Google US English Female'];
-      } else if (this.voiceCharacteristics.style === 'professional') {
-        preferVoiceNames = this.voiceCharacteristics.gender === 'male'
-          ? ['Daniel', 'Google UK English Male']
-          : ['Moira', 'Google UK English Female'];
-      } else {
-        // Default voice preferences
-        preferVoiceNames = ['Samantha', 'Google UK English Female', 'Microsoft Zira', 'Female'];
-      }
+      preferVoiceNames.unshift(this.voicePreference);
     }
     
     // Try to find a voice that matches the user's preference
@@ -87,17 +65,6 @@ class TextToSpeech {
     this.selectPreferredVoice();
   }
 
-  public setVoiceCharacteristics(characteristics: {
-    gender?: 'male' | 'female';
-    style?: 'supportive' | 'motivational' | 'professional';
-  }): void {
-    this.voiceCharacteristics = {
-      ...this.voiceCharacteristics,
-      ...characteristics
-    };
-    this.selectPreferredVoice();
-  }
-
   public getAvailableVoices(): SpeechSynthesisVoice[] {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
   }
@@ -117,18 +84,8 @@ class TextToSpeech {
       utterance.voice = this.preferredVoice;
     }
     
-    // Adjust rate based on voice style
-    if (this.voiceCharacteristics.style === 'motivational') {
-      utterance.rate = 1.1; // Slightly faster for motivational
-      utterance.pitch = 1.1; // Slightly higher pitch
-    } else if (this.voiceCharacteristics.style === 'professional') {
-      utterance.rate = 0.95; // Slightly slower for professional
-      utterance.pitch = 0.95; // Slightly lower pitch
-    } else {
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-    }
-    
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
     utterance.volume = 1.0;
     
     utterance.onend = () => {
