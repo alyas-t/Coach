@@ -2,8 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { useProfile } from "@/hooks/useProfile";
-import { useFocusAreas } from "@/hooks/useFocusAreas";
+import { toast } from "sonner";
 
 export interface Message {
   id: string;
@@ -15,200 +14,177 @@ export interface Message {
 export function useChatMessages() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const { getProfile } = useProfile();
-  const { getFocusAreas } = useFocusAreas();
 
-  const getMessages = async (date?: string) => {
+  const getMessages = async (date?: string): Promise<Message[]> => {
     if (!user) return [];
     
-    setIsLoading(true);
     try {
-      let query = supabase
+      // If no date is provided, use today's date
+      const queryDate = date || new Date().toISOString().split('T')[0];
+      
+      let { data, error } = await supabase
         .from('chat_messages')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('chat_date', queryDate)
+        .order('created_at', { ascending: true });
       
-      if (date) {
-        const startOfDay = new Date(date);
-        const endOfDay = new Date(date);
-        endOfDay.setDate(endOfDay.getDate() + 1);
-        
-        query = query
-          .gte('created_at', startOfDay.toISOString())
-          .lt('created_at', endOfDay.toISOString());
-      } else {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        query = query.gte('created_at', today.toISOString());
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: true });
-
       if (error) throw error;
       
       return data.map((message: any) => ({
         id: message.id,
         content: message.content,
-        sender: message.sender as "user" | "coach",
+        sender: message.sender,
         timestamp: new Date(message.created_at)
       }));
     } catch (error: any) {
       console.error("Error fetching messages:", error);
       return [];
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const sendMessage = async (content: string, sender: "user" | "coach") => {
-    if (!user) return null;
+  const getChatDays = async (): Promise<string[]> => {
+    if (!user) return [];
     
-    setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert({
-          user_id: user.id,
-          content,
-          sender
-        })
+        .select('chat_date')
+        .eq('user_id', user.id)
+        .order('chat_date', { ascending: false })
+        .limit(30);
+      
+      if (error) throw error;
+      
+      // Extract unique dates
+      const uniqueDates = [...new Set(data.map((item: any) => item.chat_date))];
+      return uniqueDates;
+    } catch (error: any) {
+      console.error("Error fetching chat days:", error);
+      return [];
+    }
+  };
+
+  const sendMessage = async (content: string, sender: "user" | "coach"): Promise<Message | null> => {
+    if (!user) return null;
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert([
+          {
+            user_id: user.id,
+            content,
+            sender,
+            chat_date: today
+          }
+        ])
         .select()
         .single();
-
+      
       if (error) throw error;
       
       return {
         id: data.id,
         content: data.content,
-        sender: data.sender as "user" | "coach",
+        sender: data.sender,
         timestamp: new Date(data.created_at)
       };
     } catch (error: any) {
       console.error("Error sending message:", error);
       return null;
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const generateCoachResponse = async (userMessage: string, messageHistory: Message[]) => {
-    if (!user) return "I'm sorry, but you need to be logged in to chat with me.";
-    
-    try {
-      const profile = await getProfile();
-      const focusAreas = await getFocusAreas();
-      
-      const userContext = {
-        profile: {
-          ...profile,
-          focus_areas: focusAreas
-        },
-        messages: messageHistory.slice(-5) // Reduced from 10 to 5 for faster responses
-      };
-      
-      console.log("Generating response with context:", JSON.stringify(userContext, null, 2));
-      
-      // Set a shorter timeout for faster error recovery 
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('AI response timed out')), 20000); // 20 seconds timeout
-      });
-      
-      try {
-        // Race between the Supabase function call and the timeout
-        const responsePromise = supabase.functions.invoke('gemini-chat', {
-          body: { 
-            message: userMessage, 
-            userContext,
-            max_tokens: 600 // Limit token count for faster response
-          }
-        });
-        
-        const result = await Promise.race([responsePromise, timeoutPromise]);
-        const { data, error } = result as any;
-        
-        if (error) {
-          console.error("Gemini chat function error:", error);
-          throw error;
-        }
-        
-        if (!data || !data.response) {
-          console.error("Gemini chat returned invalid response:", data);
-          throw new Error("Invalid response received from AI");
-        }
-        
-        return data.response;
-      } catch (fetchError: any) {
-        console.error("Error in Gemini chat request:", fetchError);
-        if (fetchError.message.includes('timed out')) {
-          return "I'm sorry, I'm taking too long to respond right now. Could you please try a shorter message or try again in a moment?";
-        }
-        throw fetchError;
-      }
-    } catch (error: any) {
-      console.error("Error generating coach response:", error);
-      return "I'm having trouble connecting right now. Please try again with a shorter message.";
-    }
-  };
-
-  const clearTodaysMessages = async () => {
-    if (!user) return false;
-    
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('id')
-        .eq('user_id', user.id)
-        .gte('created_at', today.toISOString());
-        
-      if (error) throw error;
-      
-      console.log(`Found ${data.length} messages for today`);
-      
-      return true;
-    } catch (error) {
-      console.error("Error checking today's messages:", error);
-      return false;
-    }
-  };
-
-  const getChatDays = async () => {
-    if (!user) return [];
+  const generateCoachResponse = async (message: string, previousMessages: Message[]): Promise<string> => {
+    if (!user) throw new Error("User not authenticated");
     
     setIsLoading(true);
+    
     try {
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
+      // Create a timeout for the request
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 30000); // 30 second timeout
       
-      const uniqueDates = new Set();
-      data.forEach(message => {
-        const date = new Date(message.created_at).toISOString().split('T')[0];
-        uniqueDates.add(date);
+      // Limit message length for faster processing
+      const shortenedMessage = message.length > 500 ? message.substring(0, 500) + "..." : message;
+      
+      // Prepare for API call
+      const contextMessages = previousMessages
+        .slice(-10) // Only include the last 10 messages for context
+        .map(msg => ({
+          role: msg.sender === "user" ? "user" : "model",
+          content: msg.content.length > 300 ? msg.content.substring(0, 300) + "..." : msg.content
+        }));
+        
+      const payload = {
+        message: shortenedMessage,
+        context: contextMessages,
+        userId: user.id
+      };
+      
+      // Call the edge function with a timeout
+      const { data, error } = await supabase.functions.invoke("gemini-chat", {
+        body: payload
       });
       
-      return Array.from(uniqueDates) as string[];
-    } catch (error) {
-      console.error("Error fetching chat days:", error);
-      return [];
+      clearTimeout(timeoutId);
+      
+      // Check if request was aborted after the fact
+      if (abortController.signal.aborted) {
+        throw new Error("Request timed out");
+      }
+      
+      if (error) {
+        console.error("Edge function error:", error);
+        throw new Error(`Failed to generate response: ${error.message}`);
+      }
+      
+      if (!data || !data.response) {
+        throw new Error("No response received from AI");
+      }
+      
+      return data.response;
+    } catch (error: any) {
+      console.error("Error generating coach response:", error);
+      
+      if (error.message === "Request timed out" || error.message?.includes("timed out")) {
+        throw new Error("AI response is taking too long. Please try a shorter message.");
+      }
+      
+      throw error;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const clearTodaysMessages = async (): Promise<void> => {
+    if (!user) return;
+    
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('chat_date', today);
+      
+      if (error) throw error;
+    } catch (error: any) {
+      console.error("Error clearing today's messages:", error);
+      toast.error("Failed to clear messages");
     }
   };
 
   return {
     getMessages,
+    getChatDays,
     sendMessage,
     generateCoachResponse,
     clearTodaysMessages,
-    getChatDays,
     isLoading
   };
 }
