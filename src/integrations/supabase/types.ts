@@ -44,9 +44,7 @@ export type Database = {
       check_ins: {
         Row: {
           check_in_date: string | null
-          check_in_type: string | null
           completed: boolean | null
-          completed_at: string | null
           created_at: string | null
           id: string
           question: string
@@ -55,9 +53,7 @@ export type Database = {
         }
         Insert: {
           check_in_date?: string | null
-          check_in_type?: string | null
           completed?: boolean | null
-          completed_at?: string | null
           created_at?: string | null
           id?: string
           question: string
@@ -66,9 +62,7 @@ export type Database = {
         }
         Update: {
           check_in_date?: string | null
-          check_in_type?: string | null
           completed?: boolean | null
-          completed_at?: string | null
           created_at?: string | null
           id?: string
           question?: string
