@@ -43,11 +43,11 @@ export function useUserPreferences() {
         
         // Select voice based on personality
         // This is a simple mapping - in a production app you might want more sophisticated matching
-        if (coachSettings?.coach_tone === 'friendly') {
+        if (coachSettings?.coachTone === 'friendly') {
           textToSpeech.setVoicePreference('Samantha');
-        } else if (coachSettings?.coach_tone === 'professional') {
+        } else if (coachSettings?.coachTone === 'professional') {
           textToSpeech.setVoicePreference('Google UK English Male');
-        } else if (coachSettings?.coach_tone === 'motivational') {
+        } else if (coachSettings?.coachTone === 'motivational') {
           textToSpeech.setVoicePreference('Microsoft David');
         }
         
@@ -55,8 +55,8 @@ export function useUserPreferences() {
           name: profile?.name || "",
           age: profile?.age || null,
           focusAreas: focusAreas || [],
-          coachStyle: coachSettings?.coach_style || "supportive",
-          coachTone: coachSettings?.coach_tone || "friendly",
+          coachStyle: coachSettings?.coachStyle || "supportive",
+          coachTone: coachSettings?.coachTone || "friendly",
           voiceEnabled: textToSpeech.getEnabled(),
           loaded: true
         });
