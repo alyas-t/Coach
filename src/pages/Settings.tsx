@@ -73,12 +73,12 @@ const Settings = () => {
         const settings = await getCoachSettings();
         if (settings) {
           console.log("Loaded settings:", settings);
-          if (settings.coach_style) setCoachStyle(settings.coach_style);
-          if (settings.coach_tone) setCoachTone(settings.coach_tone);
-          if (settings.coach_intensity) setIntensity(settings.coach_intensity);
+          if (settings.coachStyle) setCoachStyle(settings.coachStyle);
+          if (settings.coachTone) setCoachTone(settings.coachTone);
+          if (settings.intensity !== undefined) setIntensity(settings.intensity);
           
-          if (settings.morning_time) setMorningTime(settings.morning_time);
-          if (settings.evening_time) setEveningTime(settings.evening_time);
+          if (settings.morningTime) setMorningTime(settings.morningTime);
+          if (settings.eveningTime) setEveningTime(settings.eveningTime);
         }
       } catch (error) {
         console.error("Error loading settings:", error);
@@ -249,6 +249,25 @@ const Settings = () => {
                           <SelectItem value="direct">Direct & Concise</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="intensity">Coaching Intensity (1-5)</Label>
+                      <Select value={intensity.toString()} onValueChange={(value) => setIntensity(parseInt(value))}>
+                        <SelectTrigger id="intensity">
+                          <SelectValue placeholder="Select intensity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 - Very Gentle</SelectItem>
+                          <SelectItem value="2">2 - Gentle</SelectItem>
+                          <SelectItem value="3">3 - Moderate</SelectItem>
+                          <SelectItem value="4">4 - Intense</SelectItem>
+                          <SelectItem value="5">5 - Very Intense</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        How intensely your coach will push you towards your goals
+                      </p>
                     </div>
                   </CardContent>
                   <CardFooter>

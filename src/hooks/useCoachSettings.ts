@@ -27,15 +27,13 @@ export function useCoachSettings() {
     console.log("Saving coach settings:", settings);
     
     try {
-      const updateData: any = {
+      const updateData = {
         coach_style: settings.coachStyle,
-        coach_tone: settings.coachTone
+        coach_tone: settings.coachTone,
+        coach_intensity: settings.intensity !== undefined ? settings.intensity : 3,
+        morning_time: settings.morningTime || null,
+        evening_time: settings.eveningTime || null
       };
-      
-      // Add optional fields if they exist
-      if (settings.morningTime) updateData.morning_time = settings.morningTime;
-      if (settings.eveningTime) updateData.evening_time = settings.eveningTime;
-      if (settings.intensity !== undefined) updateData.coach_intensity = settings.intensity;
       
       console.log("Update data being sent to Supabase:", updateData);
       
@@ -43,7 +41,8 @@ export function useCoachSettings() {
         .from('profiles')
         .update(updateData)
         .eq('id', user.id)
-        .select();
+        .select()
+        .single();
 
       if (error) {
         console.error("Supabase error when saving settings:", error);
@@ -85,7 +84,13 @@ export function useCoachSettings() {
       }
       
       console.log("Coach settings retrieved:", data);
-      return data;
+      return {
+        coachStyle: data.coach_style || "supportive",
+        coachTone: data.coach_tone || "friendly",
+        morningTime: data.morning_time || "08:00",
+        eveningTime: data.evening_time || "20:00",
+        intensity: data.coach_intensity || 3
+      };
     } catch (error: any) {
       console.error("Error fetching coach settings:", error);
       return null;
