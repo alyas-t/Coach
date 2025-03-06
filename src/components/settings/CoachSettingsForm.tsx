@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -247,16 +246,16 @@ const CoachSettingsForm = ({ onSettingsSaved }: CoachSettingsFormProps) => {
               <Label htmlFor="morning-time">Morning Check-in</Label>
               <TimePicker
                 id="morning-time"
-                value={morningTime}
-                onChange={setMorningTime}
+                time={morningTime}
+                setTime={setMorningTime}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="evening-time">Evening Check-in</Label>
               <TimePicker
                 id="evening-time"
-                value={eveningTime}
-                onChange={setEveningTime}
+                time={eveningTime}
+                setTime={setEveningTime}
               />
             </div>
           </div>

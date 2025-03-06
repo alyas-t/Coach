@@ -9,6 +9,7 @@ interface TimePickerProps {
   setTime: (time: string) => void;
   label?: string;
   className?: string;
+  id?: string; // Add id prop to allow passing IDs for accessibility
 }
 
 export function TimePicker({
@@ -16,6 +17,7 @@ export function TimePicker({
   setTime,
   label,
   className,
+  id,
 }: TimePickerProps) {
   const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTime(e.target.value);
@@ -30,6 +32,7 @@ export function TimePicker({
           value={time}
           onChange={handleTimeChange}
           className="w-full"
+          id={id}
         />
       </div>
     </div>
