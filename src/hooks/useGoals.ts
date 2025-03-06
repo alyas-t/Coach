@@ -9,6 +9,9 @@ interface Goal {
   title: string;
   description: string;
   type: string;
+  progress?: number;
+  days_completed?: number;
+  streak?: number;
 }
 
 export function useGoals() {
@@ -73,7 +76,12 @@ export function useGoals() {
         .single();
       
       // Update streak and days_completed when completing a goal
-      let updatedData = { progress };
+      let updatedData: {
+        progress: number;
+        streak?: number;
+        days_completed?: number;
+      } = { progress };
+      
       if (progress === 1 && goalData?.progress < 1) {
         updatedData = {
           progress,
