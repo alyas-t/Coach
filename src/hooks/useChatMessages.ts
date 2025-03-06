@@ -41,8 +41,8 @@ export function useChatMessages() {
       
       if (error) throw error;
       
-      // Explicitly type the response to avoid deep type instantiation
-      return (data as ChatMessageRow[]).map(message => ({
+      // Type assertion to avoid deep type instantiation
+      return (data as unknown as ChatMessageRow[]).map(message => ({
         id: message.id,
         content: message.content,
         sender: message.sender as "user" | "coach",
@@ -67,8 +67,8 @@ export function useChatMessages() {
       
       if (error) throw error;
       
-      // Extract unique dates with explicit typing
-      const typedData = data as { chat_date: string }[];
+      // First convert to unknown, then to the expected type to avoid type errors
+      const typedData = data as unknown as { chat_date: string }[];
       const uniqueDates = [...new Set(typedData.map(item => item.chat_date))];
       return uniqueDates;
     } catch (error: any) {
@@ -98,8 +98,8 @@ export function useChatMessages() {
       
       if (error) throw error;
       
-      // Explicitly type the response
-      const typedData = data as ChatMessageRow;
+      // Type assertion for safety
+      const typedData = data as unknown as ChatMessageRow;
       return {
         id: typedData.id,
         content: typedData.content,
