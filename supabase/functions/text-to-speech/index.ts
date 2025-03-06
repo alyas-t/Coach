@@ -13,10 +13,23 @@ serve(async (req) => {
   }
   
   try {
-    const { text, voice } = await req.json()
+    console.log("Starting text-to-speech request processing");
+    
+    // Parse request body
+    let reqBody;
+    try {
+      reqBody = await req.json();
+      console.log("Request body parsed successfully");
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid request body format");
+    }
+    
+    const { text, voice } = reqBody;
     
     if (!text) {
-      throw new Error('Text is required')
+      console.error("Missing required parameter: text");
+      throw new Error('Text is required');
     }
     
     console.log("Processing TTS request for text:", text.substring(0, 50) + "...");
@@ -25,6 +38,7 @@ serve(async (req) => {
     // Use ElevenLabs TTS API with the provided API key
     const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
     if (!elevenLabsApiKey) {
+      console.error("Missing environment variable: ELEVENLABS_API_KEY");
       throw new Error('ELEVENLABS_API_KEY is not configured');
     }
     
@@ -33,42 +47,50 @@ serve(async (req) => {
     const voiceId = voice || "21m00Tcm4TlvDq8ikWAM";
     
     console.log("Making ElevenLabs API request with voice ID:", voiceId);
-    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'audio/mpeg',
-        'Content-Type': 'application/json',
-        'xi-api-key': elevenLabsApiKey
-      },
-      body: JSON.stringify({
-        text: text,
-        model_id: "eleven_monolingual_v1",
-        voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.5
-        }
-      }),
-    });
     
-    if (!response.ok) {
-      console.error("ElevenLabs API error:", response.status, response.statusText);
-      const errorText = await response.text();
-      console.error("Error details:", errorText);
-      throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
-    }
-    
-    console.log("Successfully received audio response from ElevenLabs");
-    
-    // Get audio data as arrayBuffer and convert to base64
-    const arrayBuffer = await response.arrayBuffer();
-    const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    
-    return new Response(
-      JSON.stringify({ audio: base64Audio }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    try {
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'audio/mpeg',
+          'Content-Type': 'application/json',
+          'xi-api-key': elevenLabsApiKey
+        },
+        body: JSON.stringify({
+          text: text,
+          model_id: "eleven_monolingual_v1",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.5
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        console.error("ElevenLabs API error:", response.status, response.statusText);
+        const errorText = await response.text();
+        console.error("Error details:", errorText);
+        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
-    );
+      
+      console.log("Successfully received audio response from ElevenLabs");
+      
+      // Get audio data as arrayBuffer and convert to base64
+      const arrayBuffer = await response.arrayBuffer();
+      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      
+      console.log("Successfully converted audio to base64, sending response");
+      
+      return new Response(
+        JSON.stringify({ audio: base64Audio }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    } catch (fetchError) {
+      console.error("Error making request to ElevenLabs API:", fetchError);
+      throw new Error(`Error calling ElevenLabs API: ${fetchError.message}`);
+    }
   } catch (error) {
     console.error('Text-to-speech error:', error);
     
