@@ -190,17 +190,17 @@ export function useChatMessages() {
     };
   };
 
-  // Function to generate a coach response using only Gemini API
+  // Function to generate a coach response using Perplexity API
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
-      console.log("Generating coach response with Gemini API");
+      console.log("Generating coach response with Perplexity API");
       
-      // Call the Edge Function to get AI response from Gemini
-      const { data, error } = await supabase.functions.invoke('gemini-chat', {
+      // Call the Edge Function to get AI response from Perplexity
+      const { data, error } = await supabase.functions.invoke('perplexity-chat', {
         body: {
           message: userMessage,
           history: previousMessages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
+            sender: msg.sender,
             content: msg.content
           }))
         }
@@ -212,7 +212,7 @@ export function useChatMessages() {
       }
       
       if (!data || !data.response) {
-        console.error("Invalid response from Gemini API:", data);
+        console.error("Invalid response from Perplexity API:", data);
         throw new Error("Invalid response from AI service");
       }
       

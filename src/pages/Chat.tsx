@@ -6,22 +6,34 @@ import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { History } from "lucide-react";
+import { History, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TextToSpeech from "@/utils/textToSpeech";
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
   const [lastChatDate, setLastChatDate] = useState<string | null>(null);
   const [historicalDates, setHistoricalDates] = useState<string[]>([]);
   const { getChatDays } = useChatMessages();
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<any[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>("21m00Tcm4TlvDq8ikWAM"); // Default to Rachel
+
+  useEffect(() => {
+    const tts = TextToSpeech.getInstance();
+    // Load ElevenLabs voices
+    const voices = tts.getElevenLabsVoices();
+    setAvailableVoices(voices);
+  }, []);
 
   useEffect(() => {
     if (!user) {
@@ -102,6 +114,13 @@ const Chat = () => {
       setIsLoadingHistory(false);
     }
   };
+  
+  const handleVoiceChange = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    const tts = TextToSpeech.getInstance();
+    tts.setVoicePreference(voiceId);
+    toast.success("Voice updated successfully");
+  };
 
   if (!user) return null;
 
@@ -114,17 +133,60 @@ const Chat = () => {
             <Card className="h-full overflow-hidden">
               <div className="flex items-center justify-between border-b p-3">
                 <h2 className="text-lg font-medium">Chat with your coach</h2>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setIsHistoryOpen(!isHistoryOpen)}
-                  title="View chat history"
-                >
-                  <History className="h-5 w-5" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsVoiceSettingsOpen(!isVoiceSettingsOpen)}
+                    title="Voice settings"
+                  >
+                    <Volume2 className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                    title="View chat history"
+                  >
+                    <History className="h-5 w-5" />
+                  </Button>
+                </div>
               </div>
               
-              {isHistoryOpen ? (
+              {isVoiceSettingsOpen ? (
+                <div className="p-4 h-full overflow-y-auto">
+                  <h3 className="text-lg font-medium mb-4">Voice Settings</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Select Voice</label>
+                      <Select value={selectedVoice} onValueChange={handleVoiceChange}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a voice" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableVoices.map((voice) => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              {voice.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Using ElevenLabs for more realistic voices
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => setIsVoiceSettingsOpen(false)}
+                    >
+                      Back to Chat
+                    </Button>
+                  </div>
+                </div>
+              ) : isHistoryOpen ? (
                 <div className="p-4 h-full overflow-y-auto">
                   <h3 className="text-lg font-medium mb-4">Chat History</h3>
                   {isLoadingHistory ? (
