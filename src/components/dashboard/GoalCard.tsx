@@ -1,16 +1,20 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { motion } from "@/utils/animation";
-import { CheckCircle, Clock, Flame, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { CheckCircle, Clock, Flame, Loader2, MoreHorizontal, Trash2, Calendar } from "lucide-react";
 import { useGoals } from "@/hooks/useGoals";
 import { 
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -22,6 +26,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { downloadGoalAsICalendar, getGoogleCalendarUrl } from "@/utils/calendarExport";
+import { toast } from "sonner";
 
 interface GoalCardProps {
   goal: {
@@ -57,8 +63,7 @@ const GoalCard = ({ goal, onProgressUpdate }: GoalCardProps) => {
   const handleDelete = async () => {
     try {
       await deleteGoal(goal.id);
-      // The parent component will handle removing this goal from the UI
-      window.location.reload(); // Temporary solution to refresh the page
+      window.location.reload();
     } catch (error) {
       console.error("Error deleting goal:", error);
     }
@@ -69,6 +74,26 @@ const GoalCard = ({ goal, onProgressUpdate }: GoalCardProps) => {
     if (progress >= 0.6) return "bg-blue-500";
     if (progress >= 0.3) return "bg-amber-500";
     return "bg-primary";
+  };
+
+  const handleDownloadICalendar = () => {
+    try {
+      downloadGoalAsICalendar(goal);
+      toast.success("Calendar file downloaded successfully");
+    } catch (error) {
+      console.error("Error generating calendar file:", error);
+      toast.error("Failed to generate calendar file");
+    }
+  };
+
+  const handleOpenGoogleCalendar = () => {
+    try {
+      const url = getGoogleCalendarUrl(goal);
+      window.open(url, "_blank");
+    } catch (error) {
+      console.error("Error opening Google Calendar:", error);
+      toast.error("Failed to open Google Calendar");
+    }
   };
 
   return (
@@ -99,6 +124,23 @@ const GoalCard = ({ goal, onProgressUpdate }: GoalCardProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Calendar className="mr-2 h-4 w-4" />
+                      <span>Export to Calendar</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={handleDownloadICalendar}>
+                          <span>Download .ics File</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleOpenGoogleCalendar}>
+                          <span>Add to Google Calendar</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={() => setShowDeleteAlert(true)}
@@ -170,7 +212,6 @@ const GoalCard = ({ goal, onProgressUpdate }: GoalCardProps) => {
         </CardFooter>
       </Card>
 
-      {/* Delete Alert Dialog */}
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
