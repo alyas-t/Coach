@@ -32,7 +32,7 @@ serve(async (req) => {
     // Rachel is a female voice with a neutral accent (Voice ID: 21m00Tcm4TlvDq8ikWAM)
     const voiceId = voice || "21m00Tcm4TlvDq8ikWAM";
     
-    console.log("Making ElevenLabs API request...");
+    console.log("Making ElevenLabs API request with voice ID:", voiceId);
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: {
