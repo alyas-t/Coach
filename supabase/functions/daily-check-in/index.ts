@@ -45,6 +45,17 @@ serve(async (req) => {
       // Skip if no email
       if (!userEmail) continue;
 
+      // Get user's goals
+      const { data: goals, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (goalsError) {
+        console.error(`Error fetching goals for user ${userId}:`, goalsError);
+        continue;
+      }
+
       // Create a question based on the check-in type
       const question = isEvening 
         ? "How did you do with your goals today? What went well, and what could have gone better?"
@@ -79,14 +90,39 @@ serve(async (req) => {
           continue;
         }
 
-        // Send email to user (in a real app, you would use an email service here)
+        // Prepare goals summary for email
+        let goalsSummary = "";
+        if (goals && goals.length > 0) {
+          goalsSummary = "\n\nYour current goals:\n";
+          goals.forEach((goal, index) => {
+            const progress = Math.round((goal.progress || 0) * 100);
+            goalsSummary += `${index + 1}. ${goal.title} - ${progress}% complete`;
+            if (goal.streak && goal.streak > 0) {
+              goalsSummary += ` (${goal.streak} day streak!)`;
+            }
+            goalsSummary += "\n";
+          });
+        }
+
+        // Create email content with personalization and goals
+        const emailSubject = isEvening 
+          ? `Evening Reflection Time, ${userName}` 
+          : `Good Morning ${userName}, Time to Plan Your Day`;
+        
+        const emailContent = isEvening
+          ? `Hello ${userName},\n\nIt's time for your evening check-in! Take a moment to reflect on your day and your progress with your goals.${goalsSummary}\n\nHow did you do with your goals today? What went well, and what could have gone better?\n\nChecking in regularly helps you stay on track and achieve your goals faster.\n\nBest regards,\nYour Goal Coach`
+          : `Hello ${userName},\n\nGood morning! It's time to set your intentions for the day and focus on your goals.${goalsSummary}\n\nHow are you feeling about your goals today? What steps will you take to make progress?\n\nHave a productive day!\n\nBest regards,\nYour Goal Coach`;
+        
+        // Log email details (in a real app, you would send an actual email here)
         console.log(`Would send ${isEvening ? 'evening' : 'morning'} check-in email to ${userEmail}`);
-        console.log(`Email content: Hello ${userName}, it's time for your ${isEvening ? 'evening' : 'morning'} check-in!`);
+        console.log(`Email subject: ${emailSubject}`);
+        console.log(`Email content: ${emailContent}`);
         
         processedUsers.push({
           userId,
           email: userEmail,
-          result: `${isEvening ? 'Evening' : 'Morning'} check-in created and email would be sent`
+          result: `${isEvening ? 'Evening' : 'Morning'} check-in created and email would be sent`,
+          goalsCount: goals ? goals.length : 0
         });
       } else {
         console.log(`User ${userId} already has a check-in for today with question: "${question}"`);

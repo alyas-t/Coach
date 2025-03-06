@@ -31,7 +31,7 @@ serve(async (req) => {
       throw usersError;
     }
 
-    // Get today's goals and check-ins
+    // Get today's date
     const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
 
     const processedUsers = [];
@@ -45,7 +45,7 @@ serve(async (req) => {
       // Skip if no email
       if (!userEmail) continue;
 
-      // Get user's pending goals
+      // Get user's goals
       const { data: goals, error: goalsError } = await supabase
         .from('goals')
         .select('*')
@@ -56,13 +56,18 @@ serve(async (req) => {
         continue;
       }
 
+      // Create a personalized question based on type
+      const question = checkInType === "evening"
+        ? "How did you do with your goals today? What went well, and what could have gone better?"
+        : "How are you feeling about your goals today?";
+      
       // Check if user already has a check-in of this type today
       const { data: checkIns, error: checkInsError } = await supabase
         .from('check_ins')
         .select('*')
         .eq('user_id', userId)
         .eq('check_in_date', today)
-        .eq('check_in_type', checkInType);
+        .eq('question', question);
 
       if (checkInsError) {
         console.error(`Error fetching check-ins for user ${userId}:`, checkInsError);
@@ -71,18 +76,12 @@ serve(async (req) => {
 
       // If user doesn't have a check-in of this type today, create one
       if (checkIns.length === 0) {
-        // Create a check-in with a personalized question based on type
-        const question = checkInType === "evening"
-          ? "How did you do with your goals today? What went well, and what could have gone better?"
-          : "How are you feeling about your goals today?";
-        
         const { error: insertError } = await supabase
           .from('check_ins')
           .insert({
             user_id: userId,
             question,
             check_in_date: today,
-            check_in_type: checkInType,
             completed: false
           });
 
@@ -91,15 +90,38 @@ serve(async (req) => {
           continue;
         }
 
-        // Send email to user
+        // Prepare goals summary for email
+        let goalsSummary = "";
+        if (goals && goals.length > 0) {
+          goalsSummary = "\n\nYour current goals:\n";
+          goals.forEach((goal, index) => {
+            const progress = Math.round((goal.progress || 0) * 100);
+            goalsSummary += `${index + 1}. ${goal.title} - ${progress}% complete`;
+            if (goal.streak && goal.streak > 0) {
+              goalsSummary += ` (${goal.streak} day streak!)`;
+            }
+            goalsSummary += "\n";
+          });
+        }
+
+        // Create email content with personalization and goals
+        const emailSubject = checkInType === "evening" 
+          ? `Evening Reflection Time, ${userName}` 
+          : `Good Morning ${userName}, Time to Plan Your Day`;
+        
+        const emailContent = checkInType === "evening"
+          ? `Hello ${userName},\n\nIt's time for your evening check-in! Take a moment to reflect on your day and your progress with your goals.${goalsSummary}\n\nHow did you do with your goals today? What went well, and what could have gone better?\n\nChecking in regularly helps you stay on track and achieve your goals faster.\n\nBest regards,\nYour Goal Coach`
+          : `Hello ${userName},\n\nGood morning! It's time to set your intentions for the day and focus on your goals.${goalsSummary}\n\nHow are you feeling about your goals today? What steps will you take to make progress?\n\nHave a productive day!\n\nBest regards,\nYour Goal Coach`;
+        
         // In a real app, you would use an email service like Resend here
-        console.log(`Would send ${checkInType} check-in email to ${userEmail} with subject "${checkInType === 'morning' ? 'Morning Check-in' : 'Evening Reflection'}"`);
-        console.log(`Email content: Hello ${userName}, it's time for your ${checkInType} check-in!`);
+        console.log(`Would send ${checkInType} check-in email to ${userEmail} with subject "${emailSubject}"`);
+        console.log(`Email content: ${emailContent}`);
         
         processedUsers.push({
           userId,
           email: userEmail,
-          result: `${checkInType} check-in created and email would be sent`
+          result: `${checkInType} check-in created and email would be sent`,
+          goalsCount: goals ? goals.length : 0
         });
       } else {
         console.log(`User ${userId} already has a ${checkInType} check-in for today`);
