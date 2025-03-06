@@ -257,8 +257,8 @@ const DailyCheckIn = () => {
     }));
   };
 
-  const handleVoiceChange = (voiceId: string) => {
-    tts.setElevenLabsVoice(voiceId);
+  const handleVoiceChange = (voiceName: string) => {
+    tts.setVoicePreference(voiceName);
     toast.success("Voice changed successfully");
     setVoiceMenuOpen(false);
   };
@@ -295,8 +295,8 @@ const DailyCheckIn = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <div className="text-sm font-medium px-2 py-1.5 text-muted-foreground">Select Voice</div>
-                {tts.getElevenLabsVoices().map(voice => (
-                  <DropdownMenuItem key={voice.id} onClick={() => handleVoiceChange(voice.id)}>
+                {tts.getAvailableVoices().map(voice => (
+                  <DropdownMenuItem key={voice.name} onClick={() => handleVoiceChange(voice.name)}>
                     {voice.name}
                   </DropdownMenuItem>
                 ))}
