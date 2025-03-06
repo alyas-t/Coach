@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -32,27 +31,25 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      // Use a type assertion with 'any' to prevent deep type analysis
-      const result = await supabase
+      // Avoid TypeScript deep analysis with explicit any
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_date', queryDate)
-        .order('created_at', { ascending: true });
-      
-      const { data, error } = result as any;
+        .order('created_at', { ascending: true }) as { data: any, error: any };
       
       if (error) throw error;
       
-      // Convert the any type to our known structure
-      const typedData = data as ChatMessageRow[];
-      
-      return typedData.map(message => ({
+      // Process the raw data to our expected format
+      const messages: Message[] = Array.isArray(data) ? data.map((message: any) => ({
         id: message.id,
         content: message.content,
         sender: message.sender as "user" | "coach",
         timestamp: new Date(message.created_at)
-      }));
+      })) : [];
+      
+      return messages;
     } catch (error: any) {
       console.error("Error fetching messages:", error);
       return [];
