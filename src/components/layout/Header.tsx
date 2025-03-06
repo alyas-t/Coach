@@ -1,13 +1,16 @@
 
 import { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -28,6 +31,13 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+  
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (user) {
+      e.preventDefault();
+      navigate('/dashboard');
+    }
+  };
 
   return (
     <header
@@ -39,7 +49,11 @@ const Header = () => {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
-          <Link to="/" className="flex items-center">
+          <Link 
+            to={user ? "/dashboard" : "/"} 
+            className="flex items-center"
+            onClick={handleLogoClick}
+          >
             <span className="text-xl font-medium bg-clip-text text-primary">
               PersonalCoach
             </span>

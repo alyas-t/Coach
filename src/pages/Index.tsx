@@ -1,11 +1,52 @@
-
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, BarChart3, Brain, Rocket, Zap } from "lucide-react";
 import PageTransition from "@/components/layout/PageTransition";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    // If user is logged in, check if they have completed onboarding
+    const checkOnboardingStatus = async () => {
+      if (!user) return;
+      
+      try {
+        // Check if the user has any goals set (indicating completed onboarding)
+        const { data: goals, error: goalsError } = await supabase
+          .from('goals')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+          
+        if (goalsError) throw goalsError;
+        
+        // Check if the user has coach settings (another onboarding indicator)
+        const { data: coachSettings, error: settingsError } = await supabase
+          .from('coach_settings')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(1);
+          
+        if (settingsError) throw settingsError;
+        
+        // If user has either goals or coach settings, they've likely completed onboarding
+        if ((goals && goals.length > 0) || (coachSettings && coachSettings.length > 0)) {
+          navigate('/dashboard');
+        }
+      } catch (error) {
+        console.error("Error checking onboarding status:", error);
+      }
+    };
+    
+    checkOnboardingStatus();
+  }, [user, navigate]);
+
   const features = [
     {
       icon: <Brain className="h-5 w-5" />,
