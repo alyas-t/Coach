@@ -2,7 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 
 interface AuthContextType {
@@ -22,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -38,14 +39,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     fetchSession();
 
-    const { data } = supabase.auth.onAuthStateChange((event, newSession) => {
+    const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user || null);
-      setIsLoading(false);
       
       if (event === 'SIGNED_IN' && newSession) {
-        // Redirect to dashboard or onboarding depending on user status
-        navigate('/dashboard');
+        setIsLoading(true);
+        try {
+          // Check if the user has completed onboarding by checking for goals or coach settings
+          const { data: goals, error: goalsError } = await supabase
+            .from('goals')
+            .select('id')
+            .eq('user_id', newSession.user.id)
+            .limit(1);
+            
+          if (goalsError) throw goalsError;
+          
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('coach_style, coach_tone')
+            .eq('id', newSession.user.id)
+            .single();
+            
+          if (profileError && profileError.code !== 'PGRST116') throw profileError;
+          
+          // If the user has no goals and no coach settings, redirect to onboarding
+          const needsOnboarding = (!goals || goals.length === 0) && 
+                                (!profileData || (!profileData.coach_style && !profileData.coach_tone));
+          
+          if (needsOnboarding) {
+            navigate('/onboarding');
+          } else {
+            // Only redirect to dashboard if we're not on a specific page already
+            if (location.pathname === '/' || location.pathname === '/auth') {
+              navigate('/dashboard');
+            }
+          }
+        } catch (error) {
+          console.error("Error checking onboarding status:", error);
+          // If there's an error, it's safer to redirect to onboarding
+          navigate('/onboarding');
+        } finally {
+          setIsLoading(false);
+        }
       } else if (event === 'SIGNED_OUT') {
         navigate('/');
       }
@@ -54,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const signUp = async (email: string, password: string, name: string) => {
     setIsLoading(true);

@@ -6,6 +6,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const Onboarding = () => {
   const { user } = useAuth();
@@ -30,16 +31,24 @@ const Onboarding = () => {
           .eq('user_id', user.id)
           .limit(1);
           
-        if (goalsError) throw goalsError;
+        if (goalsError) {
+          console.error("Error checking goals:", goalsError);
+          toast.error("Could not verify your account status");
+          return;
+        }
         
         // Check if the user has coach settings in their profile (another onboarding indicator)
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('coach_style, coach_tone')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
           
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("Error checking profile:", profileError);
+          toast.error("Could not verify your profile status");
+          return;
+        }
         
         // If user has either goals or coach settings defined in their profile, they've likely completed onboarding
         if ((goals && goals.length > 0) || 
@@ -49,6 +58,7 @@ const Onboarding = () => {
         }
       } catch (error) {
         console.error("Error checking onboarding status:", error);
+        toast.error("Could not check onboarding status");
       } finally {
         setIsChecking(false);
       }
