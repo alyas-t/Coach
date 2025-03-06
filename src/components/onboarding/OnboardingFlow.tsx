@@ -103,11 +103,14 @@ const OnboardingFlow = () => {
         await saveGoals(formData.goals);
       }
       
+      // Make sure intensity is always defined before saving
+      const intensity = typeof formData.intensity === 'number' ? formData.intensity : 3;
+      
       // Explicitly define the object to match CoachSettings interface
       await saveCoachSettings({
         coachStyle: formData.coachStyle,
         coachTone: formData.coachTone,
-        intensity: formData.intensity // Use the defined property directly
+        intensity: intensity
       });
       
       const textToSpeech = TextToSpeech.getInstance();
@@ -122,6 +125,7 @@ const OnboardingFlow = () => {
       
       toast.success("Onboarding completed successfully!");
       
+      // Adding a small timeout before navigation to ensure all state updates are completed
       setTimeout(() => {
         navigate("/dashboard");
         

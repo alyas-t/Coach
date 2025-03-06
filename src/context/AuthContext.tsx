@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -21,10 +22,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
+  const [authStateInitialized, setAuthStateInitialized] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchSession = async () => {
       try {
         console.log("Fetching initial session");
@@ -32,23 +36,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (error) {
           console.error("Error fetching session:", error);
-          setIsLoading(false);
-          setInitialLoad(false);
+          if (isMounted) {
+            setIsLoading(false);
+            setInitialLoad(false);
+            setAuthStateInitialized(true);
+          }
           return;
         }
         
-        setSession(data.session);
-        setUser(data.session?.user || null);
-        
-        // Don't redirect on initial load
-        if (data.session?.user && initialLoad) {
-          console.log("User is already logged in:", data.session.user.email);
+        if (isMounted) {
+          setSession(data.session);
+          setUser(data.session?.user || null);
+          
+          // Don't redirect on initial load
+          if (data.session?.user && initialLoad) {
+            console.log("User is already logged in:", data.session.user.email);
+          }
+          
+          setIsLoading(false);
+          setInitialLoad(false);
+          setAuthStateInitialized(true);
         }
       } catch (e) {
         console.error("Exception fetching session:", e);
-      } finally {
-        setIsLoading(false);
-        setInitialLoad(false);
+        if (isMounted) {
+          setIsLoading(false);
+          setInitialLoad(false);
+          setAuthStateInitialized(true);
+        }
       }
     };
 
@@ -56,28 +71,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log("Auth state changed:", event, !!newSession);
-      setSession(newSession);
-      setUser(newSession?.user || null);
       
-      if (event === 'SIGNED_IN' && newSession) {
+      if (isMounted) {
+        setSession(newSession);
+        setUser(newSession?.user || null);
+      }
+      
+      if (event === 'SIGNED_IN' && newSession && isMounted) {
         // Don't set loading again to prevent infinite loops
         try {
           const currentPath = location.pathname;
           
-          // Only redirect if on login or home page
-          if (currentPath === '/' || currentPath === '/auth') {
+          // Only redirect if on login or home page and not during initial load
+          if ((currentPath === '/' || currentPath === '/auth') && !initialLoad) {
             console.log("Redirecting to onboarding after sign in");
             navigate('/onboarding');
           }
         } catch (error) {
           console.error("Error handling sign in redirect:", error);
         }
-      } else if (event === 'SIGNED_OUT') {
+      } else if (event === 'SIGNED_OUT' && isMounted) {
         navigate('/');
       }
     });
 
     return () => {
+      isMounted = false;
       data.subscription.unsubscribe();
     };
   }, [navigate, location.pathname, initialLoad]);

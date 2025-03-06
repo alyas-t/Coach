@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -23,13 +24,31 @@ const CoachPersonalityForm = ({
   onSubmit,
   onPrev,
 }: CoachPersonalityFormProps) => {
+  // Ensure we have default values if properties are undefined
   const [coachStyle, setCoachStyle] = useState(formData.coachStyle || "supportive");
   const [coachTone, setCoachTone] = useState(formData.coachTone || "friendly");
-  const [intensity, setIntensity] = useState(formData.intensity || 3);
+  const [intensity, setIntensity] = useState(
+    typeof formData.intensity === 'number' ? formData.intensity : 3
+  );
+
+  // Sync with formData changes
+  useEffect(() => {
+    if (formData.coachStyle && formData.coachStyle !== coachStyle) {
+      setCoachStyle(formData.coachStyle);
+    }
+    if (formData.coachTone && formData.coachTone !== coachTone) {
+      setCoachTone(formData.coachTone);
+    }
+    if (typeof formData.intensity === 'number' && formData.intensity !== intensity) {
+      setIntensity(formData.intensity);
+    }
+  }, [formData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateFormData({ coachStyle, coachTone, intensity });
+    // Ensure intensity is always a number
+    const intensityValue = typeof intensity === 'number' ? intensity : 3;
+    updateFormData({ coachStyle, coachTone, intensity: intensityValue });
     onSubmit();
   };
 
