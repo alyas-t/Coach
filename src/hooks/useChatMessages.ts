@@ -34,7 +34,7 @@ export function useChatMessages() {
       return data.map((message: any) => ({
         id: message.id,
         content: message.content,
-        sender: message.sender,
+        sender: message.sender as "user" | "coach",
         timestamp: new Date(message.created_at)
       }));
     } catch (error: any) {
@@ -89,7 +89,7 @@ export function useChatMessages() {
       return {
         id: data.id,
         content: data.content,
-        sender: data.sender,
+        sender: data.sender as "user" | "coach",
         timestamp: new Date(data.created_at)
       };
     } catch (error: any) {
