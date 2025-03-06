@@ -61,6 +61,7 @@ const Settings = () => {
   const [eveningTime, setEveningTime] = useState("20:00");
   const [notificationSaving, setNotificationSaving] = useState(false);
   const [intensity, setIntensity] = useState(3);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -73,16 +74,17 @@ const Settings = () => {
         const settings = await getCoachSettings();
         if (settings) {
           console.log("Loaded settings:", settings);
-          if (settings.coachStyle) setCoachStyle(settings.coachStyle);
-          if (settings.coachTone) setCoachTone(settings.coachTone);
-          if (settings.intensity !== undefined) setIntensity(settings.intensity);
-          
-          if (settings.morningTime) setMorningTime(settings.morningTime);
-          if (settings.eveningTime) setEveningTime(settings.eveningTime);
+          setCoachStyle(settings.coachStyle || "supportive");
+          setCoachTone(settings.coachTone || "friendly");
+          setIntensity(settings.intensity !== undefined ? settings.intensity : 3);
+          setMorningTime(settings.morningTime || "08:00");
+          setEveningTime(settings.eveningTime || "20:00");
+          setSettingsLoaded(true);
         }
       } catch (error) {
         console.error("Error loading settings:", error);
         toast.error("Failed to load settings");
+        setSettingsLoaded(true);
       }
     };
     
@@ -176,6 +178,23 @@ const Settings = () => {
   };
   
   if (!user) return null;
+
+  // Wait for settings to load before displaying interactive UI
+  if (!settingsLoaded && isCoachSettingsLoading) {
+    return (
+      <PageTransition>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 flex items-center justify-center">
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin mb-4" />
+              <p>Loading settings...</p>
+            </div>
+          </main>
+        </div>
+      </PageTransition>
+    );
+  }
   
   return (
     <PageTransition>
@@ -271,7 +290,11 @@ const Settings = () => {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button onClick={handleSaveCoachSettings} disabled={isSaving || isCoachSettingsLoading} className="w-full">
+                    <Button 
+                      onClick={handleSaveCoachSettings} 
+                      disabled={isSaving || isCoachSettingsLoading} 
+                      className="w-full"
+                    >
                       {isSaving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -358,7 +381,7 @@ const Settings = () => {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button onClick={saveNotificationSettings} disabled={notificationSaving}>
+                    <Button onClick={saveNotificationSettings} disabled={notificationSaving || isCoachSettingsLoading}>
                       {notificationSaving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -416,7 +439,7 @@ const Settings = () => {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button onClick={saveNotificationSettings} disabled={notificationSaving}>
+                    <Button onClick={saveNotificationSettings} disabled={notificationSaving || isCoachSettingsLoading}>
                       {notificationSaving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

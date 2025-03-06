@@ -84,6 +84,7 @@ export function useCoachSettings() {
       }
       
       console.log("Coach settings retrieved:", data);
+      // Ensure we transform snake_case DB fields to camelCase for frontend
       return {
         coachStyle: data.coach_style || "supportive",
         coachTone: data.coach_tone || "friendly",
