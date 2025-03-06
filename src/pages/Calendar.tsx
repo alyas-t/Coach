@@ -14,10 +14,11 @@ type CheckIn = {
   id: string;
   user_id: string;
   check_in_date: string;
-  content: string;
-  completed: boolean;
-  check_in_type: 'morning' | 'evening';
-  created_at: string;
+  question: string;
+  response: string | null;
+  completed: boolean | null;
+  check_in_type: 'morning' | 'evening' | string | null;
+  created_at: string | null;
   completed_at: string | null;
 };
 
@@ -218,9 +219,9 @@ const Calendar = () => {
                             {checkIn.completed ? "Completed" : "Pending"}
                           </span>
                         </div>
-                        {checkIn.content && (
+                        {checkIn.response && (
                           <p className="text-sm text-gray-600 mt-2">
-                            {checkIn.content}
+                            {checkIn.response}
                           </p>
                         )}
                         {checkIn.completed_at && (
