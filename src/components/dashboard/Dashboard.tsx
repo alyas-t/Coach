@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useGoals } from "@/hooks/useGoals";
 import { useProfile } from "@/hooks/useProfile";
 import AddGoalDialog from "./AddGoalDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [goals, setGoals] = useState<any[]>([]);

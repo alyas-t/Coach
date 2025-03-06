@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,19 +31,37 @@ const DailyCheckIn = () => {
           .from('check_ins')
           .select('*')
           .eq('user_id', user.id)
-          .eq('check_in_date', today)
-          .order('check_in_type', { ascending: true });
+          .eq('check_in_date', today);
         
         if (error) {
           throw error;
         }
         
         if (data && data.length > 0) {
-          setCheckIns(data);
+          // Infer check-in type from the question content
+          const morningPattern = /morning|plan|today|feeling|goals today/i;
+          const eveningPattern = /evening|reflection|went well|how did you do|today's goals/i;
+          
+          const processedCheckIns = data.map(checkIn => {
+            // Determine type based on question content
+            let type = "morning"; // Default
+            if (eveningPattern.test(checkIn.question)) {
+              type = "evening";
+            } else if (morningPattern.test(checkIn.question)) {
+              type = "morning";
+            }
+            
+            return {
+              ...checkIn,
+              check_in_type: type
+            };
+          });
+          
+          setCheckIns(processedCheckIns);
           
           // Initialize responses state with existing responses
           const initialResponses: Record<string, string> = {};
-          data.forEach(checkIn => {
+          processedCheckIns.forEach(checkIn => {
             if (checkIn.response) {
               initialResponses[checkIn.id] = checkIn.response;
             } else {
@@ -54,8 +71,8 @@ const DailyCheckIn = () => {
           setResponses(initialResponses);
           
           // Set active tab to evening if it exists and is not completed, otherwise morning
-          const eveningCheckIn = data.find(c => c.check_in_type === 'evening');
-          const morningCheckIn = data.find(c => c.check_in_type === 'morning');
+          const eveningCheckIn = processedCheckIns.find(c => c.check_in_type === 'evening');
+          const morningCheckIn = processedCheckIns.find(c => c.check_in_type === 'morning');
           
           if (eveningCheckIn && !eveningCheckIn.completed) {
             setActiveTab('evening');
@@ -64,21 +81,27 @@ const DailyCheckIn = () => {
           }
         } else {
           // Create a new morning check-in for today if none exists
-          const defaultQuestion = "How are you feeling today?";
+          const defaultQuestion = "How are you feeling about your goals today?";
           const { data: newCheckIn, error: insertError } = await supabase
             .from('check_ins')
             .insert({
               user_id: user.id,
               question: defaultQuestion,
               check_in_date: today,
-              check_in_type: 'morning',
               completed: false
             })
             .select()
             .single();
           
           if (insertError) throw insertError;
-          setCheckIns([newCheckIn]);
+          
+          // Add the inferred type
+          const checkInWithType = {
+            ...newCheckIn,
+            check_in_type: "morning"
+          };
+          
+          setCheckIns([checkInWithType]);
           setResponses({ [newCheckIn.id]: '' });
         }
       } catch (error) {

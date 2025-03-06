@@ -21,7 +21,6 @@ serve(async (req) => {
   try {
     const { type = "morning" } = await req.json();
     const isEvening = type === "evening";
-    const checkInType = isEvening ? "evening" : "morning";
 
     // Get all users with their profiles
     const { data: usersData, error: usersError } = await supabase
@@ -46,64 +45,63 @@ serve(async (req) => {
       // Skip if no email
       if (!userEmail) continue;
 
-      // Check if user already has a check-in of this type today
+      // Create a question based on the check-in type
+      const question = isEvening 
+        ? "How did you do with your goals today? What went well, and what could have gone better?"
+        : "How are you feeling about your goals today?";
+        
+      // Check if user already has a check-in with this question today
       const { data: checkIns, error: checkInsError } = await supabase
         .from('check_ins')
         .select('*')
         .eq('user_id', userId)
         .eq('check_in_date', today)
-        .eq('check_in_type', checkInType);
+        .eq('question', question);
 
       if (checkInsError) {
         console.error(`Error fetching check-ins for user ${userId}:`, checkInsError);
         continue;
       }
 
-      // If user doesn't have a check-in of this type today, create one
+      // If user doesn't have a check-in with this question today, create one
       if (checkIns.length === 0) {
-        // Create a question based on the check-in type
-        const question = isEvening 
-          ? "How did you do with your goals today? What went well, and what could have gone better?"
-          : "How are you feeling about your goals today?";
-        
         const { error: insertError } = await supabase
           .from('check_ins')
           .insert({
             user_id: userId,
             question,
             check_in_date: today,
-            check_in_type: checkInType,
             completed: false
           });
 
         if (insertError) {
-          console.error(`Error creating ${checkInType} check-in for user ${userId}:`, insertError);
+          console.error(`Error creating check-in for user ${userId}:`, insertError);
           continue;
         }
 
         // Send email to user (in a real app, you would use an email service here)
-        console.log(`Would send ${checkInType} check-in email to ${userEmail}`);
-        console.log(`Email content: Hello ${userName}, it's time for your ${checkInType} check-in!`);
+        console.log(`Would send ${isEvening ? 'evening' : 'morning'} check-in email to ${userEmail}`);
+        console.log(`Email content: Hello ${userName}, it's time for your ${isEvening ? 'evening' : 'morning'} check-in!`);
         
         processedUsers.push({
           userId,
           email: userEmail,
-          result: `${checkInType} check-in created and email would be sent`
+          result: `${isEvening ? 'Evening' : 'Morning'} check-in created and email would be sent`
         });
       } else {
-        console.log(`User ${userId} already has a ${checkInType} check-in for today`);
+        console.log(`User ${userId} already has a check-in for today with question: "${question}"`);
         processedUsers.push({
           userId,
           email: userEmail,
-          result: `${checkInType} check-in already exists`
+          result: `Check-in already exists`
         });
       }
     }
 
     return new Response(JSON.stringify({ 
       success: true, 
-      checkInType,
-      message: `Processed ${processedUsers.length} users for ${checkInType} check-ins`,
+      checkInType: isEvening ? 'evening' : 'morning',
+      message: `Processed ${processedUsers.length} users for ${isEvening ? 'evening' : 'morning'} check-ins`,
       details: processedUsers
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
