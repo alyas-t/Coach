@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, StopCircle, CornerDownLeft, X } from "lucide-react";
@@ -39,8 +38,23 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
         console.error('Speech recognition error', event.error);
         if (event.error === 'not-allowed') {
           toast.error("Microphone access denied. Please allow microphone access to use voice input.");
+        } else if (event.error === 'network') {
+          toast.error("Network error. Please check your connection.");
+        } else {
+          toast.error(`Recognition error: ${event.error}`);
         }
         setIsRecording(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        // Only restart if we're still meant to be recording
+        if (isRecording) {
+          try {
+            recognitionRef.current.start();
+          } catch (error) {
+            console.error("Error restarting recognition:", error);
+          }
+        }
       };
     } else {
       toast.error("Your browser doesn't support speech recognition. Please try a different browser.");
@@ -48,7 +62,11 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
     
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          console.error("Error stopping recognition:", error);
+        }
       }
       
       if (mediaStreamRef.current) {
@@ -59,7 +77,7 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
         audioContextRef.current.close();
       }
     };
-  }, []);
+  }, [isRecording]);
   
   // Handle audio visualization
   useEffect(() => {
@@ -120,6 +138,14 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
         recognitionRef.current.start();
         setIsRecording(true);
         setTranscript("");
+        
+        // Auto-stop after 60 seconds to prevent very long recordings
+        setTimeout(() => {
+          if (isRecording) {
+            stopRecording();
+            toast.info("Recording automatically stopped after 60 seconds");
+          }
+        }, 60000);
       } catch (error) {
         console.error("Error starting speech recognition:", error);
         toast.error("Could not start speech recognition");

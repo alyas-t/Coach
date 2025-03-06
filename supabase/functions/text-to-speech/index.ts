@@ -32,7 +32,10 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
     
-    console.log("Processing TTS request for text:", text.substring(0, 50) + "...");
+    // Limit text length for faster processing
+    const limitedText = text.length > 500 ? text.substring(0, 500) + "..." : text;
+    
+    console.log("Processing TTS request for text:", limitedText.substring(0, 50) + "...");
     console.log("Using voice:", voice || "default");
     
     // Use ElevenLabs TTS API with the provided API key
@@ -48,6 +51,10 @@ serve(async (req) => {
     
     console.log("Making ElevenLabs API request with voice ID:", voiceId);
     
+    // Add timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     try {
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
         method: 'POST',
@@ -57,14 +64,17 @@ serve(async (req) => {
           'xi-api-key': elevenLabsApiKey
         },
         body: JSON.stringify({
-          text: text,
+          text: limitedText,
           model_id: "eleven_monolingual_v1",
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.5
           }
         }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         console.error("ElevenLabs API error:", response.status, response.statusText);
@@ -88,6 +98,13 @@ serve(async (req) => {
         }
       );
     } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError.name === 'AbortError') {
+        console.error("ElevenLabs API request timed out");
+        throw new Error('Text-to-speech request timed out');
+      }
+      
       console.error("Error making request to ElevenLabs API:", fetchError);
       throw new Error(`Error calling ElevenLabs API: ${fetchError.message}`);
     }

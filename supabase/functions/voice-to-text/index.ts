@@ -9,11 +9,16 @@ const corsHeaders = {
 
 // Process base64 in chunks to prevent memory issues
 function processBase64Chunks(base64String: string, chunkSize = 32768) {
+  // Remove potential data URL prefix
+  const base64Data = base64String.includes('base64,') 
+    ? base64String.split('base64,')[1] 
+    : base64String;
+    
   const chunks: Uint8Array[] = [];
   let position = 0;
   
-  while (position < base64String.length) {
-    const chunk = base64String.slice(position, position + chunkSize);
+  while (position < base64Data.length) {
+    const chunk = base64Data.slice(position, position + chunkSize);
     const binaryChunk = atob(chunk);
     const bytes = new Uint8Array(binaryChunk.length);
     
@@ -70,6 +75,12 @@ serve(async (req) => {
 
     console.log("Processing audio data");
     
+    // Check if audio data is too large (25MB limit for Whisper API)
+    if (audio.length > 33000000) { // ~25MB in base64
+      console.error("Audio data too large");
+      throw new Error('Audio file is too large. Please keep recordings under 1 minute.');
+    }
+    
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
     console.log("Audio processed, binary size:", binaryAudio.length);
@@ -84,7 +95,7 @@ serve(async (req) => {
 
     // Send to OpenAI with timeout handling
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 second timeout
     
     try {
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {

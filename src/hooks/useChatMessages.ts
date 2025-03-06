@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -103,25 +104,28 @@ export function useChatMessages() {
           ...profile,
           focus_areas: focusAreas
         },
-        messages: messageHistory.slice(-10)
+        messages: messageHistory.slice(-5) // Reduced from 10 to 5 for faster responses
       };
       
       console.log("Generating response with context:", JSON.stringify(userContext, null, 2));
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      // Set a shorter timeout for faster error recovery 
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('AI response timed out')), 20000); // 20 seconds timeout
+      });
       
       try {
-        const { data, error } = await supabase.functions.invoke('gemini-chat', {
-          body: { message: userMessage, userContext }
+        // Race between the Supabase function call and the timeout
+        const responsePromise = supabase.functions.invoke('gemini-chat', {
+          body: { 
+            message: userMessage, 
+            userContext,
+            max_tokens: 600 // Limit token count for faster response
+          }
         });
         
-        clearTimeout(timeoutId);
-        
-        if (controller.signal.aborted) {
-          console.error("Gemini chat request timed out");
-          throw new Error('AI response timed out');
-        }
+        const result = await Promise.race([responsePromise, timeoutPromise]);
+        const { data, error } = result as any;
         
         if (error) {
           console.error("Gemini chat function error:", error);
@@ -134,17 +138,16 @@ export function useChatMessages() {
         }
         
         return data.response;
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError.name === 'AbortError') {
-          console.error("Gemini chat request timed out");
-          throw new Error('AI response timed out');
+      } catch (fetchError: any) {
+        console.error("Error in Gemini chat request:", fetchError);
+        if (fetchError.message.includes('timed out')) {
+          return "I'm sorry, I'm taking too long to respond right now. Could you please try a shorter message or try again in a moment?";
         }
         throw fetchError;
       }
     } catch (error: any) {
       console.error("Error generating coach response:", error);
-      return "I'm having trouble connecting right now. Please try again later.";
+      return "I'm having trouble connecting right now. Please try again with a shorter message.";
     }
   };
 
