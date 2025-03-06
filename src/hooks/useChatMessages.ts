@@ -1,7 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { withRetry, handleSupabaseError, showErrorToast } from '@/utils/supabaseErrorHandling';
 
 // Define types for chat messages
 export interface ChatMessage {
@@ -27,78 +29,93 @@ export function useChatMessages() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [error, setError] = useState<Error | null>(null);
   const { user, session } = useAuth();
   
   // Function to load the initial messages
-  const loadInitialMessages = async () => {
+  const loadInitialMessages = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
+    setError(null);
+    
     try {
-      const response = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const loadMessages = async () => {
+        const response = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        if (response.error) throw response.error;
+        
+        // Cast the sender field to ensure it's either 'user' or 'coach'
+        const typedData = response.data?.map(msg => ({
+          ...msg,
+          sender: msg.sender as 'user' | 'coach'
+        })) || [];
+        
+        setMessages(typedData);
+        setHasMore(response.data && response.data.length === 10);
+        setPage(1);
+        
+        return typedData;
+      };
       
-      const { data, error } = response;
-      
-      if (error) throw error;
-      
-      // Cast the sender field to ensure it's either 'user' or 'coach'
-      const typedData = data?.map(msg => ({
-        ...msg,
-        sender: msg.sender as 'user' | 'coach'
-      })) || [];
-      
-      setMessages(typedData);
-      setHasMore(data && data.length === 10);
-      setPage(1);
-    } catch (error) {
-      console.error('Error loading chat messages:', error);
-      toast.error('Failed to load chat history');
+      await withRetry(loadMessages);
+    } catch (error: any) {
+      setError(error);
+      const errorMessage = handleSupabaseError(error, "Failed to load chat history");
+      showErrorToast(errorMessage, loadInitialMessages);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
   
   // Function to load more messages when scrolling
   const loadMoreMessages = async () => {
     if (!user || !hasMore || isLoading) return;
     
     setIsLoading(true);
+    setError(null);
+    
     try {
       const pageSize = 10;
       const offset = page * pageSize;
       
-      const response = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + pageSize - 1);
-      
-      const { data, error } = response;
-      
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        // Cast the sender field to ensure it's either 'user' or 'coach'
-        const typedData = data.map(msg => ({
-          ...msg,
-          sender: msg.sender as 'user' | 'coach'
-        }));
+      const loadMore = async () => {
+        const response = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
         
-        setMessages(prev => [...prev, ...typedData]);
-        setHasMore(data.length === pageSize);
-        setPage(prev => prev + 1);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more messages:', error);
-      toast.error('Failed to load more messages');
+        if (response.error) throw response.error;
+        
+        if (response.data && response.data.length > 0) {
+          // Cast the sender field to ensure it's either 'user' or 'coach'
+          const typedData = response.data.map(msg => ({
+            ...msg,
+            sender: msg.sender as 'user' | 'coach'
+          }));
+          
+          setMessages(prev => [...prev, ...typedData]);
+          setHasMore(response.data.length === pageSize);
+          setPage(prev => prev + 1);
+        } else {
+          setHasMore(false);
+        }
+        
+        return response.data;
+      };
+      
+      await withRetry(loadMore);
+    } catch (error: any) {
+      setError(error);
+      const errorMessage = handleSupabaseError(error, "Failed to load more messages");
+      showErrorToast(errorMessage, loadMoreMessages);
     } finally {
       setIsLoading(false);
     }
@@ -115,27 +132,31 @@ export function useChatMessages() {
         sender,
       };
       
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert(newMessage)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      // Cast the sender field
-      const typedData = {
-        ...data,
-        sender: data.sender as 'user' | 'coach'
+      const saveMessage = async () => {
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .insert(newMessage)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        
+        // Cast the sender field
+        return {
+          ...data,
+          sender: data.sender as 'user' | 'coach'
+        };
       };
+      
+      const typedData = await withRetry(saveMessage);
       
       // Add the new message to the beginning since messages are ordered by created_at descending
       setMessages(prev => [typedData, ...prev]);
       
       return typedData;
-    } catch (error) {
-      console.error('Error adding message:', error);
-      toast.error('Failed to send message');
+    } catch (error: any) {
+      const errorMessage = handleSupabaseError(error, "Failed to send message");
+      showErrorToast(errorMessage);
       return null;
     }
   };
@@ -172,7 +193,6 @@ export function useChatMessages() {
           timestamp: new Date(msg.created_at)
         }));
     } catch (error) {
-      console.error('Error getting messages:', error);
       return [];
     }
   };
@@ -193,41 +213,41 @@ export function useChatMessages() {
   // Function to generate a coach response using Perplexity API
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
-      // Call the Edge Function to get AI response from Perplexity
-      const { data, error } = await supabase.functions.invoke('perplexity-chat', {
-        body: {
-          message: userMessage,
-          history: previousMessages.slice(-10).map(msg => ({  // Only use last 10 messages for context
-            sender: msg.sender,
-            content: msg.content
-          }))
+      const invokeFunction = async () => {
+        // Call the Edge Function to get AI response from Perplexity
+        const { data, error } = await supabase.functions.invoke('perplexity-chat', {
+          body: {
+            message: userMessage,
+            history: previousMessages.slice(-10).map(msg => ({  // Only use last 10 messages for context
+              sender: msg.sender,
+              content: msg.content
+            }))
+          }
+        });
+        
+        if (error) throw error;
+        
+        // If we have an error message in the response but the response was successful
+        if (data?.error) {
+          console.error("Error from Perplexity API:", data.error);
+          // If we have a fallback response, use it
+          if (data?.response) {
+            return data.response;
+          }
+          throw new Error(data.error);
         }
-      });
-      
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw error;
-      }
-      
-      // If we have an error message in the response but the response was successful
-      if (data?.error) {
-        console.error("Error from Perplexity API:", data.error);
-        // If we have a fallback response, use it
-        if (data?.response) {
-          return data.response;
+        
+        if (!data || !data.response) {
+          throw new Error("Invalid response from AI service");
         }
-        throw new Error(data.error);
-      }
+        
+        return data.response;
+      };
       
-      if (!data || !data.response) {
-        console.error("Invalid response from Perplexity API:", data);
-        throw new Error("Invalid response from AI service");
-      }
-      
-      return data.response;
-      
-    } catch (error) {
-      console.error('Error generating coach response:', error);
+      return await withRetry(invokeFunction);
+    } catch (error: any) {
+      const errorMessage = handleSupabaseError(error, "Failed to get AI response");
+      showErrorToast(errorMessage);
       return "I'm having trouble connecting right now. Please try again in a moment.";
     }
   };
@@ -240,31 +260,33 @@ export function useChatMessages() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const { error } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('user_id', user.id)
-        .gte('created_at', today.toISOString());
+      const clearMessages = async () => {
+        const { error } = await supabase
+          .from('chat_messages')
+          .delete()
+          .eq('user_id', user.id)
+          .gte('created_at', today.toISOString());
+        
+        if (error) throw error;
+        
+        // Clear messages from state as well
+        setMessages([]);
+        return true;
+      };
       
-      if (error) throw error;
-      
-      // Clear messages from state as well
-      setMessages([]);
-    } catch (error) {
-      console.error('Error clearing messages:', error);
-      toast.error('Failed to clear today\'s messages');
+      await withRetry(clearMessages);
+    } catch (error: any) {
+      const errorMessage = handleSupabaseError(error, "Failed to clear today's messages");
+      showErrorToast(errorMessage);
     }
   };
 
-  // Function to get distinct chat days for history with retries
+  // Function to get distinct chat days for history
   const getChatDays = useCallback(async (): Promise<string[]> => {
     if (!user) return [];
     
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount <= maxRetries) {
-      try {
+    try {
+      const fetchDays = async () => {
         // Using a direct query to get distinct dates
         const { data, error } = await supabase
           .from('chat_messages')
@@ -272,10 +294,7 @@ export function useChatMessages() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         
-        if (error) {
-          console.error('Error getting chat days:', error);
-          throw error;
-        }
+        if (error) throw error;
         
         // Extract unique dates (YYYY-MM-DD format)
         const uniqueDates = new Set<string>();
@@ -288,21 +307,14 @@ export function useChatMessages() {
         }
         
         return Array.from(uniqueDates);
-      } catch (error: any) {
-        console.error(`Error getting chat days (attempt ${retryCount + 1}):`, error);
-        retryCount++;
-        
-        if (retryCount > maxRetries) {
-          throw error; // Let the component handle this error after max retries
-        }
-        
-        // Exponential backoff
-        const backoffTime = 1000 * Math.pow(2, retryCount - 1);
-        await new Promise(resolve => setTimeout(resolve, backoffTime));
-      }
+      };
+      
+      return await withRetry(fetchDays);
+    } catch (error: any) {
+      const errorMessage = handleSupabaseError(error, "Failed to load chat history");
+      showErrorToast(errorMessage);
+      return [];
     }
-    
-    return []; // Fallback empty array if all retries fail
   }, [user]);
   
   // Load initial messages on component mount
@@ -310,7 +322,7 @@ export function useChatMessages() {
     if (user) {
       loadInitialMessages();
     }
-  }, [user]);
+  }, [user, loadInitialMessages]);
   
   return {
     messages: messages.slice().sort((a, b) => 
@@ -318,6 +330,7 @@ export function useChatMessages() {
     ), // Return chronologically sorted messages
     isLoading,
     hasMore,
+    error,
     loadMoreMessages,
     addMessage,
     getMessages,

@@ -2,7 +2,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useCoachSettings } from "@/hooks/useCoachSettings";
 import { useEffect, useState } from "react";
-import { Brain, Heart, Smile, Zap } from "lucide-react";
+import { Brain, Heart, Smile, Zap, Bot } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MessageBubbleProps {
   message: {
@@ -17,13 +18,23 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isCoach = message.sender === "coach";
   const { getCoachSettings } = useCoachSettings();
   const [coachStyle, setCoachStyle] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   
   useEffect(() => {
     if (isCoach) {
       const loadCoachStyle = async () => {
-        const settings = await getCoachSettings();
-        if (settings) {
-          setCoachStyle(settings.coachStyle);
+        setIsLoading(true);
+        setError(null);
+        try {
+          const settings = await getCoachSettings();
+          if (settings) {
+            setCoachStyle(settings.coachStyle);
+          }
+        } catch (error: any) {
+          setError(error);
+        } finally {
+          setIsLoading(false);
         }
       };
       
@@ -36,6 +47,10 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   };
 
   const getCoachIcon = () => {
+    if (isLoading) {
+      return <Skeleton className="h-4 w-4 rounded-full" />;
+    }
+    
     switch (coachStyle) {
       case "supportive":
         return <Heart className="h-4 w-4" />;
@@ -46,7 +61,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
       case "analytical":
         return <Brain className="h-4 w-4" />;
       default:
-        return "PC";
+        return <Bot className="h-4 w-4" />;
     }
   };
 

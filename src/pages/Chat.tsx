@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ChatInterface from "@/components/chat/ChatInterface";
@@ -5,13 +6,14 @@ import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { History, Volume2, AlertCircle } from "lucide-react";
+import { History, Volume2, AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import TextToSpeech from "@/utils/textToSpeech";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Chat = () => {
   const { user } = useAuth();
@@ -28,16 +30,20 @@ const Chat = () => {
   const [selectedVoice, setSelectedVoice] = useState<string>("21m00Tcm4TlvDq8ikWAM"); // Default to Rachel
 
   useEffect(() => {
-    const tts = TextToSpeech.getInstance();
-    // Load ElevenLabs voices
-    const voices = tts.getElevenLabsVoices();
-    setAvailableVoices(voices);
-    
-    // Check if there's a preferred voice in localStorage
-    const savedVoice = localStorage.getItem('preferred_voice');
-    if (savedVoice) {
-      setSelectedVoice(savedVoice);
-      tts.setVoicePreference(savedVoice);
+    try {
+      const tts = TextToSpeech.getInstance();
+      // Load ElevenLabs voices
+      const voices = tts.getElevenLabsVoices();
+      setAvailableVoices(voices);
+      
+      // Check if there's a preferred voice in localStorage
+      const savedVoice = localStorage.getItem('preferred_voice');
+      if (savedVoice) {
+        setSelectedVoice(savedVoice);
+        tts.setVoicePreference(savedVoice);
+      }
+    } catch (error) {
+      console.error("Error initializing text-to-speech:", error);
     }
   }, []);
 
@@ -49,31 +55,9 @@ const Chat = () => {
     setHistoryError(false);
     
     try {
-      let attempts = 0;
-      const maxAttempts = 3;
-      let success = false;
-      let days: string[] = [];
-      
-      while (attempts < maxAttempts && !success) {
-        try {
-          days = await getChatDays();
-          success = true;
-        } catch (err) {
-          attempts++;
-          console.error(`Attempt ${attempts} failed to load chat history:`, err);
-          
-          if (attempts >= maxAttempts) {
-            throw err;
-          }
-          
-          // Wait with exponential backoff before retrying
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
-        }
-      }
-      
+      const days = await getChatDays();
       setHistoricalDates(days);
     } catch (error) {
-      console.error("Error loading chat history:", error);
       setHistoryError(true);
       toast.error("Failed to load chat history", {
         description: "We couldn't retrieve your previous conversations",
@@ -136,12 +120,17 @@ const Chat = () => {
   };
   
   const handleVoiceChange = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-    const tts = TextToSpeech.getInstance();
-    tts.setVoicePreference(voiceId);
-    // Save preference to localStorage
-    localStorage.setItem('preferred_voice', voiceId);
-    toast.success("Voice updated successfully");
+    try {
+      setSelectedVoice(voiceId);
+      const tts = TextToSpeech.getInstance();
+      tts.setVoicePreference(voiceId);
+      // Save preference to localStorage
+      localStorage.setItem('preferred_voice', voiceId);
+      toast.success("Voice updated successfully");
+    } catch (error) {
+      console.error("Error changing voice:", error);
+      toast.error("Failed to update voice");
+    }
   };
 
   if (!user) return null;
@@ -219,9 +208,15 @@ const Chat = () => {
                     </div>
                   ) : historyError ? (
                     <div className="text-center py-6">
-                      <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-2" />
-                      <p className="text-muted-foreground mb-4">Failed to load chat history</p>
-                      <Button onClick={retryLoadHistory}>
+                      <Alert variant="destructive" className="mb-6">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Failed to load chat history</AlertTitle>
+                        <AlertDescription>
+                          We couldn't retrieve your previous conversations. Please try again.
+                        </AlertDescription>
+                      </Alert>
+                      <Button onClick={retryLoadHistory} variant="outline">
+                        <RefreshCw className="mr-2 h-4 w-4" />
                         Retry
                       </Button>
                     </div>

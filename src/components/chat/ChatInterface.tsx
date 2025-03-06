@@ -6,7 +6,7 @@ import VoiceChatModal from "./VoiceChatModal";
 import ChatHistory from "./ChatHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Loader2, Volume2, VolumeX, Headphones, History } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, VolumeX, Headphones, History, RefreshCw } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
@@ -14,6 +14,8 @@ import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
 import TextToSpeech from "@/utils/textToSpeech";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,6 +25,7 @@ const ChatInterface = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<Error | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [lastChatDate, setLastChatDate] = useState<string | null>(null);
@@ -40,9 +43,18 @@ const ChatInterface = () => {
     if (!user) return;
     
     setIsLoading(true);
+    setLoadError(null);
+    
     try {
-      const profile = await getProfile();
-      setUserProfile(profile);
+      let profile = null;
+      
+      try {
+        profile = await getProfile();
+        setUserProfile(profile);
+      } catch (profileError) {
+        // Continue even if profile loading fails
+        console.error("Error loading profile:", profileError);
+      }
       
       // Get today's date
       const today = new Date().toISOString().split('T')[0];
@@ -53,7 +65,6 @@ const ChatInterface = () => {
       
       // If the stored date is different from today, reset the chat
       if (storedChatDate !== today) {
-        console.log("New day detected, resetting chat");
         // This will clear today's messages if they exist
         await clearTodaysMessages();
         localStorage.setItem('last_chat_date', today);
@@ -85,9 +96,9 @@ const ChatInterface = () => {
       } else {
         setMessages(chatMessages);
       }
-    } catch (error) {
-      console.error("Error loading messages:", error);
-      toast.error("Failed to load your chat history", {
+    } catch (error: any) {
+      setLoadError(error);
+      toast.error("Failed to load your chat", {
         description: "Please try refreshing the page",
         action: {
           label: "Retry",
@@ -97,7 +108,7 @@ const ChatInterface = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, navigate, getMessages, sendMessage, clearTodaysMessages, getProfile]);
+  }, [user, getMessages, sendMessage, clearTodaysMessages, getProfile]);
 
   useEffect(() => {
     if (!user) {
@@ -172,13 +183,11 @@ const ChatInterface = () => {
           }, 300);
         }
       }
-      
-      setIsTyping(false);
     } catch (error) {
       console.error("Error handling message:", error);
       toast.error("Something went wrong sending your message");
-      setIsTyping(false);
     } finally {
+      setIsTyping(false);
       setIsMessageSending(false);
     }
   };
@@ -194,6 +203,32 @@ const ChatInterface = () => {
     toast.info(newState ? "Voice feedback enabled" : "Voice feedback disabled");
   };
 
+  // Handle loading errors with retry button
+  if (loadError) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Failed to load chat</AlertTitle>
+              <AlertDescription>
+                There was a problem loading your chat messages. This could be due to a network issue.
+              </AlertDescription>
+            </Alert>
+            <Button 
+              className="w-full" 
+              onClick={loadChatMessages}
+              variant="default"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -206,7 +241,7 @@ const ChatInterface = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="space-y-4 pb-4">
           {messages.map((message, index) => (

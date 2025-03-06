@@ -130,13 +130,12 @@ function prepareMessages(systemPrompt: string, history: any[], message: string):
  * @throws {Error} If all retry attempts fail
  */
 async function makeRequestWithRetry(messages: any[]): Promise<Response> {
-  let response: Response | null = null;
   let retries = 0;
   let lastError: Error | null = null;
   
   while (retries <= CONFIG.RETRY.MAX_ATTEMPTS) {
     try {
-      response = await fetch(CONFIG.API_URL, {
+      const response = await fetch(CONFIG.API_URL, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${CONFIG.API_KEY}`,
