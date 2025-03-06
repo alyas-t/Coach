@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -5,7 +6,7 @@ import PersonalDetailsForm from "./PersonalDetailsForm";
 import GoalSettingForm from "./GoalSettingForm";
 import CoachPersonalityForm from "./CoachPersonalityForm";
 import animations from "@/utils/animation";
-import { CheckIcon, Loader2 } from "lucide-react";
+import { CheckIcon, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useFocusAreas } from "@/hooks/useFocusAreas";
@@ -13,6 +14,8 @@ import { useGoals } from "@/hooks/useGoals";
 import { useCoachSettings } from "@/hooks/useCoachSettings";
 import { toast } from "sonner";
 import TextToSpeech from "@/utils/textToSpeech";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const steps = [
   { id: 1, name: "Personal Details" },
@@ -31,6 +34,7 @@ const OnboardingFlow = () => {
     coachTone: "friendly",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -67,6 +71,8 @@ const OnboardingFlow = () => {
     if (!user) return;
     
     setIsSubmitting(true);
+    setError(null);
+    
     try {
       // Update profile
       await updateProfile({
@@ -106,15 +112,22 @@ const OnboardingFlow = () => {
       // Show success toast and speak welcome message
       toast.success("Onboarding completed successfully!");
       
-      // Speak welcome message and navigate when done
-      textToSpeech.speak(welcomeMessage, () => {
-        navigate("/dashboard");
-      });
-    } catch (error) {
+      // Navigate to dashboard and speak welcome message
+      navigate("/dashboard");
+      setTimeout(() => {
+        textToSpeech.speak(welcomeMessage);
+      }, 500);
+    } catch (error: any) {
       console.error("Error submitting onboarding data:", error);
+      setError(error.message || "There was an error saving your data. Please try again.");
       toast.error("There was an error saving your data. Please try again.");
       setIsSubmitting(false);
     }
+  };
+
+  const handleErrorRetry = () => {
+    setError(null);
+    setIsSubmitting(false);
   };
 
   return (
@@ -174,12 +187,27 @@ const OnboardingFlow = () => {
       {/* Step Content */}
       <div className="glass-card rounded-xl p-6 md:p-8 relative overflow-hidden">
         {isSubmitting && (
-          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex items-center justify-center z-50">
             <div className="flex flex-col items-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="mt-2 text-sm text-muted-foreground">Saving your information...</p>
             </div>
           </div>
+        )}
+        
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-auto" 
+              onClick={handleErrorRetry}
+            >
+              Try Again
+            </Button>
+          </Alert>
         )}
         
         <AnimatePresence mode="wait">
