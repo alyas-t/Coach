@@ -1,33 +1,140 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Check, X, Loader2 } from "lucide-react";
 import { motion } from "@/utils/animation";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 const DailyCheckIn = () => {
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [checkInStage, setCheckInStage] = useState(0);
+  const [checkIn, setCheckIn] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [response, setResponse] = useState("");
+  const { user } = useAuth();
   
-  const questions = [
-    "How are you feeling today?",
-    "What's your main focus for today?",
-    "Is there anything challenging you today?",
-  ];
+  useEffect(() => {
+    const fetchTodayCheckIn = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      try {
+        const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
+        
+        const { data, error } = await supabase
+          .from('check_ins')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('check_in_date', today)
+          .single();
+        
+        if (error && error.code !== 'PGSQL_ERROR_NO_ROWS') {
+          throw error;
+        }
+        
+        if (data) {
+          setCheckIn(data);
+          if (data.response) {
+            setResponse(data.response);
+          }
+        } else {
+          // Create a new check-in for today
+          const defaultQuestion = "How are you feeling today?";
+          const { data: newCheckIn, error: insertError } = await supabase
+            .from('check_ins')
+            .insert({
+              user_id: user.id,
+              question: defaultQuestion,
+              check_in_date: today,
+              completed: false
+            })
+            .select()
+            .single();
+          
+          if (insertError) throw insertError;
+          setCheckIn(newCheckIn);
+        }
+      } catch (error) {
+        console.error("Error fetching check-in:", error);
+        toast.error("Could not load your daily check-in");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchTodayCheckIn();
+  }, [user]);
   
-  const handleComplete = () => {
-    if (checkInStage < questions.length - 1) {
-      setCheckInStage(checkInStage + 1);
-    } else {
-      setIsCompleted(true);
+  const handleComplete = async () => {
+    if (!checkIn || !user) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('check_ins')
+        .update({
+          response,
+          completed: true
+        })
+        .eq('id', checkIn.id);
+      
+      if (error) throw error;
+      
+      setCheckIn(prev => ({...prev, completed: true}));
+      toast.success("Check-in completed successfully!");
+    } catch (error) {
+      console.error("Error saving check-in:", error);
+      toast.error("Failed to save your check-in");
+    } finally {
+      setIsSaving(false);
     }
   };
   
-  const handleSkip = () => {
-    setIsCompleted(true);
+  const handleSkip = async () => {
+    if (!checkIn || !user) return;
+    
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('check_ins')
+        .update({
+          completed: true
+        })
+        .eq('id', checkIn.id);
+      
+      if (error) throw error;
+      
+      setCheckIn(prev => ({...prev, completed: true}));
+      toast.success("Check-in skipped");
+    } catch (error) {
+      console.error("Error skipping check-in:", error);
+      toast.error("Failed to skip your check-in");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  if (isCompleted) {
+  if (isLoading) {
+    return (
+      <Card className="border-primary/20">
+        <CardContent className="p-6 flex justify-center items-center">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="mt-2 text-sm text-muted-foreground">Loading your daily check-in...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!checkIn) {
+    return null;
+  }
+
+  if (checkIn.completed) {
     return (
       <Card className="bg-gradient-to-r from-green-50 to-green-100 border-green-200">
         <CardContent className="p-6">
@@ -64,41 +171,55 @@ const DailyCheckIn = () => {
               variant="outline"
               className="mt-4 sm:mt-0 bg-white/90 hover:bg-white border-white/20 text-primary"
               onClick={handleSkip}
+              disabled={isSaving}
             >
-              Skip Today
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
+                </>
+              ) : (
+                "Skip Today"
+              )}
             </Button>
           </div>
         </div>
         
         <div className="p-6">
           <motion.div
-            key={checkInStage}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             className="space-y-4"
-          >
-            <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-              <span>Question {checkInStage + 1} of {questions.length}</span>
-              <span>{Math.round(((checkInStage + 1) / questions.length) * 100)}% complete</span>
-            </div>
-            
-            <h4 className="text-lg font-medium">{questions[checkInStage]}</h4>
+          >            
+            <h4 className="text-lg font-medium">{checkIn.question}</h4>
             
             <div className="bg-muted/50 rounded-lg p-4 min-h-[100px] border border-border">
-              <textarea
+              <Textarea
                 className="w-full bg-transparent resize-none focus:outline-none min-h-[80px]"
                 placeholder="Type your response here..."
-              ></textarea>
+                value={response}
+                onChange={(e) => setResponse(e.target.value)}
+              />
             </div>
             
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" size="sm" onClick={handleSkip}>
+              <Button variant="outline" size="sm" onClick={handleSkip} disabled={isSaving}>
                 <X className="h-4 w-4 mr-1" /> Skip
               </Button>
-              <Button size="sm" onClick={handleComplete}>
-                <Check className="h-4 w-4 mr-1" /> 
-                {checkInStage < questions.length - 1 ? "Next" : "Complete"}
+              <Button 
+                size="sm" 
+                onClick={handleComplete} 
+                disabled={isSaving || !response.trim()}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-1" /> Complete
+                  </>
+                )}
               </Button>
             </div>
           </motion.div>

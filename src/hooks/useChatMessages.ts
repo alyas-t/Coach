@@ -89,8 +89,10 @@ export function useChatMessages() {
           ...profile,
           focus_areas: focusAreas
         },
-        messages: messageHistory.slice(-5) // Only send the last 5 messages for context
+        messages: messageHistory.slice(-10) // Send the last 10 messages for context
       };
+      
+      console.log("Generating response with context:", userContext);
       
       const { data, error } = await supabase.functions.invoke('gemini-chat', {
         body: { message: userMessage, userContext }

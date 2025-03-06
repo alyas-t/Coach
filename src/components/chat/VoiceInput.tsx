@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, StopCircle, CornerDownLeft, X } from "lucide-react";
 import { motion } from "@/utils/animation";
+import { toast } from "sonner";
 
 interface VoiceInputProps {
   onTranscript: (transcript: string) => void;
@@ -13,52 +14,133 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [amplitude, setAmplitude] = useState(0);
-
-  // Mock speech recognition - in a real app, this would use the Web Speech API
+  
+  const recognitionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  
+  useEffect(() => {
+    // Initialize Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      
+      recognitionRef.current.onresult = (event: any) => {
+        const current = event.resultIndex;
+        const result = event.results[current];
+        const transcriptValue = result[0].transcript;
+        setTranscript(transcriptValue);
+      };
+      
+      recognitionRef.current.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        if (event.error === 'not-allowed') {
+          toast.error("Microphone access denied. Please allow microphone access to use voice input.");
+        }
+        setIsRecording(false);
+      };
+    } else {
+      toast.error("Your browser doesn't support speech recognition. Please try a different browser.");
+    }
+    
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+  
+  // Handle audio visualization
   useEffect(() => {
     if (isRecording) {
-      // Simulate recording animation
-      const intervalId = setInterval(() => {
-        setAmplitude(Math.random() * 50 + 10);
-      }, 100);
-      
-      // Simulate transcript updating
-      const mockTranscripts = [
-        "I...",
-        "I'm feeling...",
-        "I'm feeling pretty good today.",
-        "I'm feeling pretty good today. I completed my morning workout.",
-      ];
-      
-      let index = 0;
-      const transcriptInterval = setInterval(() => {
-        if (index < mockTranscripts.length) {
-          setTranscript(mockTranscripts[index]);
-          index++;
-        } else {
-          clearInterval(transcriptInterval);
+      // Set up audio visualization
+      const setupAudioVisualization = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+          
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          audioContextRef.current = new AudioContext();
+          analyserRef.current = audioContextRef.current.createAnalyser();
+          
+          const source = audioContextRef.current.createMediaStreamSource(stream);
+          source.connect(analyserRef.current);
+          
+          analyserRef.current.fftSize = 256;
+          const bufferLength = analyserRef.current.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+          
+          const updateAmplitude = () => {
+            if (analyserRef.current && isRecording) {
+              analyserRef.current.getByteFrequencyData(dataArray);
+              
+              // Calculate average amplitude
+              let sum = 0;
+              for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+              }
+              const avg = sum / bufferLength;
+              setAmplitude(avg);
+              
+              requestAnimationFrame(updateAmplitude);
+            }
+          };
+          
+          updateAmplitude();
+        } catch (error) {
+          console.error("Error accessing microphone:", error);
+          toast.error("Could not access microphone. Please check your permissions.");
+          setIsRecording(false);
         }
-      }, 1000);
-      
-      return () => {
-        clearInterval(intervalId);
-        clearInterval(transcriptInterval);
       };
+      
+      setupAudioVisualization();
+    } else {
+      // Clean up
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
     }
   }, [isRecording]);
 
   const startRecording = () => {
-    setIsRecording(true);
-    setTranscript("");
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+        setTranscript("");
+      } catch (error) {
+        console.error("Error starting speech recognition:", error);
+        toast.error("Could not start speech recognition");
+      }
+    } else {
+      toast.error("Speech recognition not available");
+    }
   };
 
   const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
     setIsRecording(false);
   };
 
   const submitTranscript = () => {
     if (transcript.trim()) {
       onTranscript(transcript);
+    } else {
+      toast.error("No speech detected. Please try again.");
     }
   };
 
@@ -97,7 +179,7 @@ const VoiceInput = ({ onTranscript, onCancel }: VoiceInputProps) => {
           <div className="mb-4 h-12 flex items-center justify-center">
             <div className="flex items-end space-x-1">
               {[...Array(20)].map((_, i) => {
-                const height = Math.min(40, Math.max(3, amplitude * Math.sin(i / 2))) + 5;
+                const height = Math.min(40, Math.max(3, amplitude * Math.sin(i / 2) * 0.5)) + 5;
                 return (
                   <motion.div
                     key={i}

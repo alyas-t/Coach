@@ -29,15 +29,52 @@ serve(async (req) => {
     // Create system prompt based on user profile
     let systemPrompt = "You are a personal coach and assistant who helps users with their goals, motivation, and well-being.";
     
+    // Add user name if available
+    if (userProfile.name) {
+      systemPrompt += ` Your user's name is ${userProfile.name}.`;
+    }
+    
     // Add coaching style if available
-    if (userProfile.coach_style || userProfile.coach_tone) {
-      systemPrompt += ` Your style is ${userProfile.coach_style || 'supportive'} and your tone is ${userProfile.coach_tone || 'friendly'}.`;
+    if (userProfile.coach_style) {
+      switch(userProfile.coach_style) {
+        case 'supportive':
+          systemPrompt += " Your coaching style is supportive. Focus on encouragement, positive reinforcement, and emotional support.";
+          break;
+        case 'directive':
+          systemPrompt += " Your coaching style is directive. Provide clear instructions, detailed guidance, and specific action steps.";
+          break;
+        case 'challenging':
+          systemPrompt += " Your coaching style is challenging. Push the user to step outside their comfort zone, set ambitious goals, and overcome obstacles.";
+          break;
+        default:
+          systemPrompt += ` Your style is ${userProfile.coach_style}.`;
+      }
+    }
+    
+    // Add communication tone if available
+    if (userProfile.coach_tone) {
+      switch(userProfile.coach_tone) {
+        case 'friendly':
+          systemPrompt += " Your tone is friendly and conversational. Use casual language, show warmth, and be approachable.";
+          break;
+        case 'professional':
+          systemPrompt += " Your tone is professional. Be straightforward, focused on results, and maintain a certain formality.";
+          break;
+        case 'motivational':
+          systemPrompt += " Your tone is motivational. Be energetic, inspiring, and use language that drives action.";
+          break;
+        default:
+          systemPrompt += ` Your tone is ${userProfile.coach_tone}.`;
+      }
     }
     
     // Add focus areas if available
     if (userProfile.focus_areas && userProfile.focus_areas.length > 0) {
       systemPrompt += ` The user is focused on: ${userProfile.focus_areas.join(', ')}.`;
     }
+    
+    // Include advice on addressing user by name
+    systemPrompt += " Address the user by their name occasionally to create a more personal connection.";
 
     // Prepare messages for the API
     const contents = [
@@ -49,7 +86,7 @@ serve(async (req) => {
       { role: "user", parts: [{ text: message }] }
     ];
 
-    console.log("Sending request to Gemini API");
+    console.log("Sending request to Gemini API with system prompt:", systemPrompt);
     
     const response = await fetch(API_URL, {
       method: "POST",

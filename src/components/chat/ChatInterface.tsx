@@ -9,6 +9,8 @@ import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
 import { useNavigate } from "react-router-dom";
+import { useProfile } from "@/hooks/useProfile";
+import { toast } from "sonner";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -16,10 +18,12 @@ const ChatInterface = () => {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { getMessages, sendMessage, generateCoachResponse } = useChatMessages();
+  const { getProfile } = useProfile();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,24 +36,31 @@ const ChatInterface = () => {
       setIsLoading(true);
       try {
         const chatMessages = await getMessages();
+        const profile = await getProfile();
+        setUserProfile(profile);
         
         if (chatMessages.length === 0) {
-          // Add initial welcome message if no messages exist
-          const welcomeMessage: Message = {
+          // Add personalized welcome message if no messages exist
+          const welcomeMessage = profile?.name 
+            ? `Hello ${profile.name}! How are you feeling today?` 
+            : "Good morning! How are you feeling today?";
+            
+          const initialMessage: Message = {
             id: "welcome",
-            content: "Good morning! How are you feeling today?",
-            sender: "coach",
+            content: welcomeMessage,
+            sender: "coach" as "coach",
             timestamp: new Date()
           };
-          setMessages([welcomeMessage]);
+          setMessages([initialMessage]);
           
           // Save the welcome message to the database
-          await sendMessage(welcomeMessage.content, welcomeMessage.sender);
+          await sendMessage(initialMessage.content, initialMessage.sender);
         } else {
           setMessages(chatMessages);
         }
       } catch (error) {
         console.error("Error loading messages:", error);
+        toast.error("Failed to load your chat history");
       } finally {
         setIsLoading(false);
       }
@@ -94,7 +105,7 @@ const ChatInterface = () => {
         );
       }
       
-      // Get AI response using Gemini API
+      // Get AI response using Gemini API with user context
       const aiResponse = await generateCoachResponse(inputText, messages);
       
       // Save coach message to database
@@ -107,6 +118,7 @@ const ChatInterface = () => {
       setIsTyping(false);
     } catch (error) {
       console.error("Error handling message:", error);
+      toast.error("Something went wrong sending your message");
       setIsTyping(false);
     }
   };
