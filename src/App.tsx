@@ -15,6 +15,7 @@ import Chat from "./pages/Chat";
 import Auth from "./pages/Auth";
 import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
+import About from "./pages/About";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/calendar" element={<Calendar />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/about" element={<About />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AnimatePresence>

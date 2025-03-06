@@ -1,4 +1,3 @@
-
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
@@ -13,12 +12,10 @@ const Index = () => {
   const { user } = useAuth();
   
   useEffect(() => {
-    // If user is logged in, check if they have completed onboarding
     const checkOnboardingStatus = async () => {
       if (!user) return;
       
       try {
-        // Check if the user has any goals set (indicating completed onboarding)
         const { data: goals, error: goalsError } = await supabase
           .from('goals')
           .select('id')
@@ -27,7 +24,6 @@ const Index = () => {
           
         if (goalsError) throw goalsError;
         
-        // Check if the user has coach settings in their profile (another onboarding indicator)
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('coach_style, coach_tone')
@@ -36,7 +32,6 @@ const Index = () => {
           
         if (profileError) throw profileError;
         
-        // If user has either goals or coach settings defined in their profile, they've likely completed onboarding
         if ((goals && goals.length > 0) || 
             (profileData && (profileData.coach_style || profileData.coach_tone))) {
           navigate('/dashboard');
@@ -71,7 +66,6 @@ const Index = () => {
     <PageTransition>
       <div className="min-h-screen flex flex-col">
         <main className="flex-1">
-          {/* Hero Section */}
           <section className="relative overflow-hidden pt-32 md:pt-40 pb-16 md:pb-24">
             <div className="absolute top-0 left-0 right-0 h-screen bg-gradient-to-b from-primary/5 to-transparent -z-10" />
             
@@ -94,9 +88,11 @@ const Index = () => {
                         Get Started <ArrowRight className="h-4 w-4" />
                       </Button>
                     </Link>
-                    <Button size="lg" variant="outline">
-                      Learn More
-                    </Button>
+                    <Link to="/about">
+                      <Button size="lg" variant="outline">
+                        Learn More
+                      </Button>
+                    </Link>
                   </div>
                 </motion.div>
               </div>
@@ -123,7 +119,6 @@ const Index = () => {
             </div>
           </section>
           
-          {/* Features Section */}
           <section className="py-16 md:py-24 bg-muted/30">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-3xl mx-auto text-center mb-12 md:mb-16">
@@ -156,7 +151,6 @@ const Index = () => {
             </div>
           </section>
           
-          {/* CTA Section */}
           <section className="py-16 md:py-24">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-5xl mx-auto bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-8 md:p-12 text-center">
