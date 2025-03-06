@@ -96,20 +96,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async () => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`
-      }
-    });
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
 
-    if (error) {
-      toast.error(error.message);
+      if (error) {
+        setIsLoading(false);
+        throw error;
+      }
+
+      // No need to set loading to false here as the redirect will happen
+    } catch (error: any) {
       setIsLoading(false);
       throw error;
     }
-
-    // No need to set loading to false here as the redirect will happen
   };
 
   const signOut = async () => {

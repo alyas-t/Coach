@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import PageTransition from "@/components/layout/PageTransition";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -16,11 +17,13 @@ const Auth = () => {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const { signIn, signUp, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setAuthError(null);
     
     try {
       if (isSignUp) {
@@ -37,9 +40,15 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     try {
+      setAuthError(null);
       await signInWithGoogle();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google authentication error:", error);
+      if (error.message?.includes("provider is not enabled")) {
+        setAuthError("Google authentication is not enabled in Supabase settings. Please contact the administrator.");
+      } else {
+        setAuthError(error.message || "Failed to sign in with Google");
+      }
     }
   };
 
@@ -59,6 +68,13 @@ const Auth = () => {
           </CardHeader>
           
           <CardContent>
+            {authError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <div className="space-y-2">
