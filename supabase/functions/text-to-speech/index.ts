@@ -19,17 +19,29 @@ serve(async (req) => {
     let reqBody;
     try {
       reqBody = await req.json();
-      console.log("Request body parsed successfully");
+      console.log("Request body parsed successfully:", JSON.stringify(reqBody).substring(0, 100));
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
-      throw new Error("Invalid request body format");
+      return new Response(
+        JSON.stringify({ error: "Invalid request body format" }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     const { text, voice } = reqBody;
     
     if (!text) {
       console.error("Missing required parameter: text");
-      throw new Error('Text is required');
+      return new Response(
+        JSON.stringify({ error: "Text is required" }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     console.log("Processing TTS request for text:", text.substring(0, 50) + "...");
@@ -39,7 +51,13 @@ serve(async (req) => {
     const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
     if (!elevenLabsApiKey) {
       console.error("Missing environment variable: ELEVENLABS_API_KEY");
-      throw new Error('ELEVENLABS_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: "ELEVENLABS_API_KEY is not configured" }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     // Voice ID mapping - default to "Rachel" voice if not specified
@@ -68,18 +86,42 @@ serve(async (req) => {
       
       if (!response.ok) {
         console.error("ElevenLabs API error:", response.status, response.statusText);
-        const errorText = await response.text();
-        console.error("Error details:", errorText);
-        throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
+        let errorDetails = "Unknown error";
+        try {
+          errorDetails = await response.text();
+          console.error("Error details:", errorDetails);
+        } catch (e) {
+          console.error("Could not read error details");
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: `ElevenLabs API error: ${response.status} ${response.statusText}`,
+            details: errorDetails
+          }),
+          { 
+            status: 502, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
       }
       
       console.log("Successfully received audio response from ElevenLabs");
       
       // Get audio data as arrayBuffer and convert to base64
       const arrayBuffer = await response.arrayBuffer();
-      const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const uint8Array = new Uint8Array(arrayBuffer);
+      console.log("Audio data size (bytes):", uint8Array.length);
       
-      console.log("Successfully converted audio to base64, sending response");
+      // Convert to base64 in chunks to avoid memory issues
+      let base64Audio = "";
+      const chunkSize = 10000;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        base64Audio += btoa(String.fromCharCode(...chunk));
+      }
+      
+      console.log("Successfully converted audio to base64, size:", base64Audio.length);
       
       return new Response(
         JSON.stringify({ audio: base64Audio }),
@@ -89,15 +131,21 @@ serve(async (req) => {
       );
     } catch (fetchError) {
       console.error("Error making request to ElevenLabs API:", fetchError);
-      throw new Error(`Error calling ElevenLabs API: ${fetchError.message}`);
+      return new Response(
+        JSON.stringify({ error: `Error calling ElevenLabs API: ${fetchError.message}` }),
+        { 
+          status: 502, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
   } catch (error) {
     console.error('Text-to-speech error:', error);
     
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || "Unknown error" }),
       {
-        status: 400,
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

@@ -1,13 +1,11 @@
 
-import { useState, useRef, useEffect } from "react";
-import MessageBubble from "./MessageBubble";
+import { useState, useRef, useEffect, useCallback } from "react";
+import ChatMessages from "./ChatMessages";
+import ChatInput from "./ChatInput";
 import VoiceInput from "./VoiceInput";
 import VoiceChatModal from "./VoiceChatModal";
 import ChatHistory from "./ChatHistory";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings, Loader2, Volume2, VolumeX, Headphones, History } from "lucide-react";
-import { motion } from "@/utils/animation";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
 import { useNavigate } from "react-router-dom";
@@ -101,23 +99,19 @@ const ChatInterface = () => {
       // Cancel any ongoing speech when component unmounts
       tts.current.cancel();
     };
-  }, [user, navigate]);
+  }, [user, navigate, getMessages, sendMessage, clearTodaysMessages, getProfile]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSendMessage = async (text: string = inputText) => {
-    if (text.trim() === "") return;
+  const handleSendMessage = async () => {
+    if (inputText.trim() === "") return;
 
     // Create a temporary message with a temporary ID
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
-      content: text,
+      content: inputText,
       sender: "user",
       timestamp: new Date(),
     };
@@ -133,7 +127,7 @@ const ChatInterface = () => {
     
     try {
       // Save user message to database
-      const savedUserMessage = await sendMessage(text, "user");
+      const savedUserMessage = await sendMessage(inputText, "user");
       
       if (savedUserMessage) {
         // Replace the temporary message with the saved one
@@ -143,7 +137,7 @@ const ChatInterface = () => {
       }
       
       // Get AI response using Gemini API with user context
-      const aiResponse = await generateCoachResponse(text, messages);
+      const aiResponse = await generateCoachResponse(inputText, messages);
       
       // Save coach message to database
       const savedCoachMessage = await sendMessage(aiResponse, "coach");
@@ -189,118 +183,45 @@ const ChatInterface = () => {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        <div className="space-y-4 pb-4">
-          {messages.map((message, index) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1, duration: 0.3 }}
-            >
-              <MessageBubble message={message} />
-            </motion.div>
-          ))}
-          
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center space-x-2 py-2"
-            >
-              <div className="inline-block bg-primary/10 text-primary rounded-full p-2 px-3 ml-4">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: "0ms" }}></div>
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: "200ms" }}></div>
-                  <div className="w-2 h-2 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: "400ms" }}></div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </div>
-        <div ref={messagesEndRef} />
-      </div>
-      
       {isVoiceMode ? (
         <VoiceInput onTranscript={handleVoiceInput} onCancel={() => setIsVoiceMode(false)} />
       ) : (
-        <div className="border-t p-4">
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setIsVoiceMode(true)} 
-              className="shrink-0"
-              title="Voice input"
-            >
-              <Mic className="h-5 w-5 text-muted-foreground" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsVoiceChatOpen(true)}
-              className="shrink-0"
-              title="Voice chat mode"
-            >
-              <Headphones className="h-5 w-5 text-muted-foreground" />
-            </Button>
-            <Input
-              placeholder="Type a message..."
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              className="focus-ring"
-            />
-            <Button 
-              onClick={() => handleSendMessage()} 
-              disabled={inputText.trim() === ""}
-              size="icon"
-              className="shrink-0"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-            <Button 
-              variant="outline"
-              size="icon" 
-              className="shrink-0"
-              onClick={toggleSpeech}
-              title={speechEnabled ? "Disable voice" : "Enable voice"}
-            >
-              {speechEnabled ? (
-                <Volume2 className="h-5 w-5 text-muted-foreground" />
-              ) : (
-                <VolumeX className="h-5 w-5 text-muted-foreground" />
-              )}
-            </Button>
-            <Button 
-              variant="outline"
-              size="icon" 
-              className="shrink-0"
-              onClick={() => setIsHistoryOpen(true)}
-              title="Chat history"
-            >
-              <History className="h-5 w-5 text-muted-foreground" />
-            </Button>
-          </div>
-        </div>
+        <>
+          <ChatMessages 
+            messages={messages} 
+            isTyping={isTyping} 
+            scrollToBottom={scrollToBottom} 
+          />
+          
+          <ChatInput 
+            inputText={inputText}
+            setInputText={setInputText}
+            handleSendMessage={handleSendMessage}
+            setIsVoiceMode={setIsVoiceMode}
+            setIsVoiceChatOpen={setIsVoiceChatOpen}
+            setIsHistoryOpen={setIsHistoryOpen}
+            toggleSpeech={toggleSpeech}
+            speechEnabled={speechEnabled}
+          />
+        </>
       )}
 
       {isVoiceChatOpen && (
         <VoiceChatModal 
           isOpen={isVoiceChatOpen} 
           onClose={() => setIsVoiceChatOpen(false)} 
-          onSendMessage={handleSendMessage}
+          onSendMessage={(text) => {
+            setInputText(text);
+            handleSendMessage();
+          }}
         />
       )}
 
       {isHistoryOpen && (
         <ChatHistory onClose={() => setIsHistoryOpen(false)} />
       )}
+
+      <div ref={messagesEndRef} />
     </div>
   );
 };
