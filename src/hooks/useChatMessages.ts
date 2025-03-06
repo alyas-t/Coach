@@ -27,7 +27,7 @@ export function useChatMessages() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   
   // Function to load the initial messages
   const loadInitialMessages = async () => {
@@ -189,26 +189,18 @@ export function useChatMessages() {
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
       // Call the Edge Function to get AI response
-      const response = await fetch(`${supabase.url}/functions/v1/gemini-chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token}`
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('gemini-chat', {
+        body: {
           message: userMessage,
           history: previousMessages.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'model',
             content: msg.content
           }))
-        })
+        }
       });
       
-      if (!response.ok) {
-        throw new Error(`Error: ${response.status}`);
-      }
+      if (error) throw error;
       
-      const data = await response.json();
       return data.response || "I'm sorry, I couldn't generate a response.";
     } catch (error) {
       console.error('Error generating coach response:', error);
