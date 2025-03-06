@@ -1,5 +1,8 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useCoachSettings } from "@/hooks/useCoachSettings";
+import { useEffect, useState } from "react";
+import { Brain, Heart, Smile, Zap } from "lucide-react";
 
 interface MessageBubbleProps {
   message: {
@@ -12,9 +15,39 @@ interface MessageBubbleProps {
 
 const MessageBubble = ({ message }: MessageBubbleProps) => {
   const isCoach = message.sender === "coach";
+  const { getCoachSettings } = useCoachSettings();
+  const [coachStyle, setCoachStyle] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (isCoach) {
+      const loadCoachStyle = async () => {
+        const settings = await getCoachSettings();
+        if (settings) {
+          setCoachStyle(settings.coachStyle);
+        }
+      };
+      
+      loadCoachStyle();
+    }
+  }, [isCoach, getCoachSettings]);
   
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getCoachIcon = () => {
+    switch (coachStyle) {
+      case "supportive":
+        return <Heart className="h-4 w-4" />;
+      case "directive":
+        return <Zap className="h-4 w-4" />;
+      case "challenging":
+        return <Smile className="h-4 w-4" />;
+      case "analytical":
+        return <Brain className="h-4 w-4" />;
+      default:
+        return "PC";
+    }
   };
 
   return (
@@ -24,7 +57,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           <>
             <AvatarImage src="/placeholder.svg" alt="Coach" />
             <AvatarFallback className="bg-primary text-primary-foreground">
-              PC
+              {getCoachIcon()}
             </AvatarFallback>
           </>
         ) : (

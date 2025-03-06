@@ -173,7 +173,7 @@ export function useChatMessages() {
         uniqueDates.add(date);
       });
       
-      return Array.from(uniqueDates);
+      return Array.from(uniqueDates) as string[];
     } catch (error) {
       console.error("Error fetching chat days:", error);
       return [];

@@ -31,7 +31,7 @@ serve(async (req) => {
     
     // Add user name if available
     if (userProfile.name) {
-      systemPrompt += ` Your user's name is ${userProfile.name}.`;
+      systemPrompt += ` Your user's name is ${userProfile.name}. Address them by name multiple times throughout your responses.`;
     }
     
     // Add user age if available for age-appropriate advice
@@ -135,6 +135,25 @@ serve(async (req) => {
     
     // Add guidance about response length and structure
     systemPrompt += " Keep your responses concise and well-structured - typically 2-4 paragraphs. Break down complex ideas into digestible points. Your advice should be actionable and practical, something they can implement right away.";
+    
+    // Add different greetings based on coaching style
+    if (userProfile.coach_style) {
+      systemPrompt += " For your initial greeting each day, use:";
+      switch(userProfile.coach_style) {
+        case 'supportive':
+          systemPrompt += " A warm, encouraging opening that shows you're happy to see them and ready to support them in their journey.";
+          break;
+        case 'directive':
+          systemPrompt += " A clear, purposeful opening that sets the tone for productive conversation and helps them focus for the day.";
+          break;
+        case 'challenging':
+          systemPrompt += " An energetic, ambitious opening that immediately gets them thinking about their goals and pushing their limits.";
+          break;
+        case 'analytical':
+          systemPrompt += " A thoughtful, insightful opening that prompts them to reflect on patterns and data from their progress.";
+          break;
+      }
+    }
     
     console.log("Using system prompt:", systemPrompt);
     
