@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -32,19 +31,13 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      // Break up the query to prevent deep type instantiation
-      // First create the base query without executing it
-      const query = supabase
+      // Perform the query directly without chaining to avoid deep type instantiation
+      const { data, error } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_date', queryDate)
-        .order('created_at', { ascending: true });
-      
-      // Execute the query separately, using Function.prototype.call to avoid TypeScript analyzing the chain
-      const response = await Function.prototype.call.call(query.then, query);
-      
-      const { data, error } = response;
+        .order('created_at', { ascending: true }) as { data: any, error: any };
       
       if (error) throw error;
       
@@ -58,6 +51,7 @@ export function useChatMessages() {
       
       return messages;
     } catch (error: any) {
+      // Keep this error log as it's important for debugging issues with fetching messages
       console.error("Error fetching messages:", error);
       return [];
     }
@@ -81,6 +75,7 @@ export function useChatMessages() {
       const uniqueDates = [...new Set(typedData.map(item => item.chat_date))];
       return uniqueDates;
     } catch (error: any) {
+      // Keep this error log as it's important for debugging issues with fetching chat days
       console.error("Error fetching chat days:", error);
       return [];
     }
@@ -116,6 +111,7 @@ export function useChatMessages() {
         timestamp: new Date(typedData.created_at)
       };
     } catch (error: any) {
+      // Keep this error log as it's important for debugging issues with sending messages
       console.error("Error sending message:", error);
       return null;
     }
@@ -161,6 +157,7 @@ export function useChatMessages() {
       }
       
       if (error) {
+        // Keep this error log as it provides crucial information about edge function failures
         console.error("Edge function error:", error);
         throw new Error(`Failed to generate response: ${error.message}`);
       }
@@ -171,6 +168,7 @@ export function useChatMessages() {
       
       return data.response;
     } catch (error: any) {
+      // Keep this error log as it's important for debugging AI response generation issues
       console.error("Error generating coach response:", error);
       
       if (error.message === "Request timed out" || error.message?.includes("timed out")) {
@@ -197,6 +195,7 @@ export function useChatMessages() {
       
       if (error) throw error;
     } catch (error: any) {
+      // Keep this error log as it's important for user feedback about message deletion
       console.error("Error clearing today's messages:", error);
       toast.error("Failed to clear messages");
     }

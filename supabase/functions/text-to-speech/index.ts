@@ -13,13 +13,10 @@ serve(async (req) => {
   }
   
   try {
-    console.log("Starting text-to-speech request processing");
-    
     // Parse request body
     let reqBody;
     try {
       reqBody = await req.json();
-      console.log("Request body parsed successfully");
     } catch (parseError) {
       console.error("Error parsing request body:", parseError);
       throw new Error("Invalid request body format");
@@ -35,9 +32,6 @@ serve(async (req) => {
     // Limit text length for faster processing
     const limitedText = text.length > 500 ? text.substring(0, 500) + "..." : text;
     
-    console.log("Processing TTS request for text:", limitedText.substring(0, 50) + "...");
-    console.log("Using voice:", voice || "default");
-    
     // Use ElevenLabs TTS API with the provided API key
     const elevenLabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
     if (!elevenLabsApiKey) {
@@ -48,8 +42,6 @@ serve(async (req) => {
     // Voice ID mapping - default to "Rachel" voice if not specified
     // Rachel is a female voice with a neutral accent (Voice ID: 21m00Tcm4TlvDq8ikWAM)
     const voiceId = voice || "21m00Tcm4TlvDq8ikWAM";
-    
-    console.log("Making ElevenLabs API request with voice ID:", voiceId);
     
     // Add timeout handling
     const controller = new AbortController();
@@ -83,13 +75,9 @@ serve(async (req) => {
         throw new Error(`ElevenLabs API error: ${response.status} ${response.statusText}`);
       }
       
-      console.log("Successfully received audio response from ElevenLabs");
-      
       // Get audio data as arrayBuffer and convert to base64
       const arrayBuffer = await response.arrayBuffer();
       const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      
-      console.log("Successfully converted audio to base64, sending response");
       
       return new Response(
         JSON.stringify({ audio: base64Audio }),

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +34,6 @@ const UpcomingCheckIns = () => {
         return;
       }
       
-      console.log("Fetched check-ins:", data);
       setCheckIns(data || []);
     };
     
@@ -52,7 +50,6 @@ const UpcomingCheckIns = () => {
       }
       
       if (data) {
-        console.log("Fetched user settings:", data);
         setUserSettings({
           morningTime: data.morning_time || "08:00",
           eveningTime: data.evening_time || "20:00"
@@ -69,17 +66,12 @@ const UpcomingCheckIns = () => {
     const currentMinutes = new Date().getMinutes();
     const upcomingCheckIns = [];
     
-    // Find morning and evening check-ins
     const morningCheckIn = checkIns.find(c => c.check_in_type === 'morning');
     const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
     
-    // Check completion status
     const isMorningCompleted = morningCheckIn && morningCheckIn.completed;
     const isEveningCompleted = eveningCheckIn && eveningCheckIn.completed;
     
-    console.log("Check-in status:", { isMorningCompleted, isEveningCompleted });
-    
-    // Parse time strings
     const [morningHour, morningMinute] = userSettings.morningTime.split(':').map(Number);
     const [eveningHour, eveningMinute] = userSettings.eveningTime.split(':').map(Number);
     
@@ -91,7 +83,6 @@ const UpcomingCheckIns = () => {
       currentHour > eveningHour || 
       (currentHour === eveningHour && currentMinutes >= eveningMinute);
     
-    // Only show morning check-in if not completed
     if (!isMorningCompleted && (!isPastEveningTime)) {
       upcomingCheckIns.push({
         id: 'morning',
@@ -101,7 +92,6 @@ const UpcomingCheckIns = () => {
       });
     }
     
-    // Only show evening check-in if not completed
     if (!isEveningCompleted) {
       upcomingCheckIns.push({
         id: 'evening',
@@ -111,7 +101,6 @@ const UpcomingCheckIns = () => {
       });
     }
     
-    // If both check-ins are completed or time has passed, show next day's morning check-in
     if (upcomingCheckIns.length === 0) {
       upcomingCheckIns.push({
         id: 'morning',
@@ -121,12 +110,10 @@ const UpcomingCheckIns = () => {
       });
     }
     
-    console.log("Upcoming check-ins:", upcomingCheckIns);
     return upcomingCheckIns;
   };
 
   const scheduleReminder = (checkInType, time) => {
-    // Request notification permission if not granted
     if (window.Notification && Notification.permission !== "granted") {
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
@@ -145,7 +132,6 @@ const UpcomingCheckIns = () => {
   const setupReminder = (checkInType, time) => {
     const [hours, minutes] = time.split(' at ')[1].split(':').map(Number);
     
-    // Set notification time
     const now = new Date();
     const notificationTime = new Date();
     
@@ -155,7 +141,6 @@ const UpcomingCheckIns = () => {
     
     notificationTime.setHours(hours, minutes, 0, 0);
     
-    // If time has already passed today, don't schedule (unless it's tomorrow)
     if (notificationTime < now && !time.includes('Tomorrow')) {
       toast.error("Can't set reminder for a time that has already passed");
       return;
@@ -163,13 +148,11 @@ const UpcomingCheckIns = () => {
     
     const timeUntilNotification = notificationTime.getTime() - now.getTime();
     
-    // Clear any existing reminders
     const existingReminderId = localStorage.getItem(`${checkInType}_reminder`);
     if (existingReminderId) {
       clearTimeout(parseInt(existingReminderId));
     }
     
-    // Set new reminder
     const reminderId = setTimeout(() => {
       new Notification("Check-in Reminder", {
         body: checkInType === 'morning' 

@@ -48,8 +48,6 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Processing voice-to-text request");
-    
     // Parse request body
     let reqBody;
     try {
@@ -72,8 +70,6 @@ serve(async (req) => {
       console.error("Missing OPENAI_API_KEY environment variable");
       throw new Error('OpenAI API key is not configured')
     }
-
-    console.log("Processing audio data");
     
     // Check if audio data is too large (25MB limit for Whisper API)
     if (audio.length > 33000000) { // ~25MB in base64
@@ -83,15 +79,12 @@ serve(async (req) => {
     
     // Process audio in chunks
     const binaryAudio = processBase64Chunks(audio);
-    console.log("Audio processed, binary size:", binaryAudio.length);
     
     // Prepare form data
     const formData = new FormData();
     const blob = new Blob([binaryAudio], { type: 'audio/webm' });
     formData.append('file', blob, 'audio.webm');
     formData.append('model', 'whisper-1');
-    
-    console.log("Sending request to OpenAI");
 
     // Send to OpenAI with timeout handling
     const controller = new AbortController();
@@ -116,7 +109,6 @@ serve(async (req) => {
       }
 
       const result = await response.json();
-      console.log("Received transcription:", result.text);
 
       return new Response(
         JSON.stringify({ text: result.text }),

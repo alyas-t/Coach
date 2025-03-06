@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Loader2 } from "lucide-react";
@@ -60,14 +59,12 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
     
-    // Set a timeout for the transcription process
     timeoutRef.current = window.setTimeout(() => {
       setIsTranscribing(false);
       toast.error("Transcription is taking too long. Please try again.");
     }, 20000); // 20 seconds timeout
     
     try {
-      // Convert blob to base64
       const reader = new FileReader();
       
       reader.onloadend = async () => {
@@ -80,7 +77,6 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
           
           console.log("Sending audio to voice-to-text function");
           
-          // Call the Supabase Edge Function
           const { data, error } = await supabase.functions.invoke("voice-to-text", {
             body: { audio: base64Audio }
           });
