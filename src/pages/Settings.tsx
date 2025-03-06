@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -87,6 +88,8 @@ const Settings = () => {
   }, [user, navigate, getCoachSettings]);
   
   const handleSaveCoachSettings = async () => {
+    if (isSaving) return;
+    
     setIsSaving(true);
     console.log("Saving coach settings:", { coachStyle, coachTone });
     
@@ -95,16 +98,19 @@ const Settings = () => {
         coachStyle,
         coachTone
       });
-      toast.success("Coach settings saved successfully");
+      
+      // No need for toast here as it's handled in the hook
     } catch (error) {
       console.error("Error in handleSaveCoachSettings:", error);
-      toast.error("Failed to save coach settings");
+      // No need for toast here as it's handled in the hook
     } finally {
       setIsSaving(false);
     }
   };
 
   const saveNotificationSettings = async () => {
+    if (notificationSaving) return;
+    
     setNotificationSaving(true);
     try {
       await saveCoachSettings({
@@ -117,10 +123,10 @@ const Settings = () => {
       scheduleDailyNotification("morning", morningTime, "Time for your Morning Planning!");
       scheduleDailyNotification("evening", eveningTime, "Time for your Evening Reflection!");
       
-      toast.success("Notification settings saved");
+      // No need for toast here as it's handled in the hook
     } catch (error) {
       console.error("Error saving notification settings:", error);
-      toast.error("Failed to save notification settings");
+      // No need for toast here as it's handled in the hook
     } finally {
       setNotificationSaving(false);
     }
@@ -242,7 +248,7 @@ const Settings = () => {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button onClick={handleSaveCoachSettings} disabled={isSaving || isCoachSettingsLoading}>
+                    <Button onClick={handleSaveCoachSettings} disabled={isSaving || isCoachSettingsLoading} className="w-full">
                       {isSaving ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

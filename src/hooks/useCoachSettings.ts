@@ -19,6 +19,7 @@ export function useCoachSettings() {
   const saveCoachSettings = async (settings: CoachSettings) => {
     if (!user) {
       console.error("No user found when trying to save coach settings");
+      toast.error("You must be logged in to save settings");
       return;
     }
     
@@ -38,17 +39,21 @@ export function useCoachSettings() {
       
       console.log("Update data being sent to Supabase:", updateData);
       
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('profiles')
         .update(updateData)
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select();
 
       if (error) {
         console.error("Supabase error when saving settings:", error);
+        toast.error("Failed to save coach settings: " + error.message);
         throw error;
       }
       
-      console.log("Coach settings saved successfully");
+      console.log("Coach settings saved successfully:", data);
+      toast.success("Coach settings saved successfully");
+      return data;
     } catch (error: any) {
       console.error("Error saving coach settings:", error);
       toast.error(error.message || "Failed to save coach settings");
@@ -72,7 +77,7 @@ export function useCoachSettings() {
         .from('profiles')
         .select('coach_style, coach_tone, morning_time, evening_time, coach_intensity')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("Error fetching coach settings:", error);
