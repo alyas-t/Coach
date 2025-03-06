@@ -4,13 +4,14 @@ import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings, Loader2 } from "lucide-react";
+import { Mic, Send, Settings, Loader2, Volume2, VolumeX } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
 import { useNavigate } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "sonner";
+import TextToSpeech from "@/utils/textToSpeech";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -19,12 +20,14 @@ const ChatInterface = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [speechEnabled, setSpeechEnabled] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { getMessages, sendMessage, generateCoachResponse } = useChatMessages();
   const { getProfile } = useProfile();
   const navigate = useNavigate();
+  const tts = useRef(TextToSpeech.getInstance());
 
   useEffect(() => {
     if (!user) {
@@ -55,6 +58,9 @@ const ChatInterface = () => {
           
           // Save the welcome message to the database
           await sendMessage(initialMessage.content, initialMessage.sender);
+          
+          // Speak the welcome message
+          tts.current.speak(welcomeMessage);
         } else {
           setMessages(chatMessages);
         }
@@ -67,6 +73,11 @@ const ChatInterface = () => {
     };
     
     loadMessages();
+    
+    return () => {
+      // Cancel any ongoing speech when component unmounts
+      tts.current.cancel();
+    };
   }, [user, navigate]);
 
   const scrollToBottom = () => {
@@ -94,6 +105,9 @@ const ChatInterface = () => {
     // Simulate coach typing
     setIsTyping(true);
     
+    // Cancel any ongoing speech
+    tts.current.cancel();
+    
     try {
       // Save user message to database
       const savedUserMessage = await sendMessage(inputText, "user");
@@ -113,6 +127,11 @@ const ChatInterface = () => {
       
       if (savedCoachMessage) {
         setMessages((prev) => [...prev, savedCoachMessage]);
+        
+        // Speak the AI response if speech is enabled
+        if (speechEnabled) {
+          tts.current.speak(aiResponse);
+        }
       }
       
       setIsTyping(false);
@@ -126,6 +145,12 @@ const ChatInterface = () => {
   const handleVoiceInput = (transcript: string) => {
     setInputText(transcript);
     setIsVoiceMode(false);
+  };
+  
+  const toggleSpeech = () => {
+    const newState = tts.current.toggleEnabled();
+    setSpeechEnabled(newState);
+    toast.info(newState ? "Voice feedback enabled" : "Voice feedback disabled");
   };
 
   if (isLoading) {
@@ -205,6 +230,19 @@ const ChatInterface = () => {
               className="shrink-0"
             >
               <Send className="h-5 w-5" />
+            </Button>
+            <Button 
+              variant="outline"
+              size="icon" 
+              className="shrink-0"
+              onClick={toggleSpeech}
+              title={speechEnabled ? "Disable voice" : "Enable voice"}
+            >
+              {speechEnabled ? (
+                <Volume2 className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <VolumeX className="h-5 w-5 text-muted-foreground" />
+              )}
             </Button>
             <Button 
               variant="outline"
