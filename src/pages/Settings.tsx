@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -42,7 +41,7 @@ import {
   Bell, 
   Calendar 
 } from "lucide-react";
-import { TimePickerDemo } from "@/components/settings/TimePicker";
+import { TimePicker } from "@/components/settings/TimePicker";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -55,7 +54,6 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTab, setSelectedTab] = useState("coach");
   
-  // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [morningTime, setMorningTime] = useState("08:00");
@@ -74,7 +72,6 @@ const Settings = () => {
         setCoachStyle(settings.coach_style || "supportive");
         setCoachTone(settings.coach_tone || "friendly");
         
-        // Load notification times if available
         if (settings.morning_time) setMorningTime(settings.morning_time);
         if (settings.evening_time) setEveningTime(settings.evening_time);
       }
@@ -108,7 +105,6 @@ const Settings = () => {
         eveningTime
       });
       
-      // Schedule notifications for the selected times
       scheduleDailyNotification("morning", morningTime, "Time for your Morning Planning!");
       scheduleDailyNotification("evening", eveningTime, "Time for your Evening Reflection!");
       
@@ -122,23 +118,19 @@ const Settings = () => {
   };
   
   const scheduleDailyNotification = (type, time, message) => {
-    // Only attempt to schedule if browser supports notifications
     if (window.Notification && Notification.permission === "granted") {
       const [hours, minutes] = time.split(':').map(Number);
       
-      // Calculate when to send the notification
       const now = new Date();
       const scheduledTime = new Date();
       scheduledTime.setHours(hours, minutes, 0, 0);
       
-      // If time has already passed today, schedule for tomorrow
       if (scheduledTime < now) {
         scheduledTime.setDate(scheduledTime.getDate() + 1);
       }
       
       const timeUntilNotification = scheduledTime.getTime() - now.getTime();
       
-      // Store the timeout ID in localStorage to be able to clear it later
       const existingTimeoutId = localStorage.getItem(`${type}_notification_timeout`);
       if (existingTimeoutId) {
         clearTimeout(parseInt(existingTimeoutId));
@@ -150,7 +142,6 @@ const Settings = () => {
           icon: "/favicon.ico"
         });
         
-        // Schedule next day's notification
         scheduleDailyNotification(type, time, message);
       }, timeUntilNotification);
       
