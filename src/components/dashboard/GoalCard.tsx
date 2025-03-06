@@ -4,7 +4,8 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { motion } from "@/utils/animation";
-import { CheckCircle, Clock, Flame } from "lucide-react";
+import { CheckCircle, Clock, Flame, Loader2 } from "lucide-react";
+import { useGoals } from "@/hooks/useGoals";
 
 interface GoalCardProps {
   goal: {
@@ -13,19 +14,27 @@ interface GoalCardProps {
     description: string;
     type: string;
     progress: number;
-    daysCompleted: number;
+    days_completed: number;
     streak: number;
   };
-  updateProgress: (id: string, progress: number) => void;
+  onProgressUpdate: (id: string, progress: number) => void;
 }
 
-const GoalCard = ({ goal, updateProgress }: GoalCardProps) => {
+const GoalCard = ({ goal, onProgressUpdate }: GoalCardProps) => {
   const [hovering, setHovering] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const { updateGoalProgress } = useGoals();
   
   const isComplete = goal.progress >= 1;
   
-  const handleComplete = () => {
-    updateProgress(goal.id, 1);
+  const handleComplete = async () => {
+    setUpdating(true);
+    try {
+      await updateGoalProgress(goal.id, 1);
+      onProgressUpdate(goal.id, 1);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const getProgressColor = (progress: number) => {
@@ -101,7 +110,11 @@ const GoalCard = ({ goal, updateProgress }: GoalCardProps) => {
               size="sm"
               onClick={handleComplete}
               className="text-xs h-7"
+              disabled={updating}
             >
+              {updating ? (
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+              ) : null}
               Mark Complete
             </Button>
           </motion.div>
@@ -109,6 +122,6 @@ const GoalCard = ({ goal, updateProgress }: GoalCardProps) => {
       </CardFooter>
     </Card>
   );
-};
+}
 
 export default GoalCard;

@@ -4,29 +4,54 @@ import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings } from "lucide-react";
+import { Mic, Send, Settings, Loader2 } from "lucide-react";
 import { motion } from "@/utils/animation";
-
-interface Message {
-  id: string;
-  content: string;
-  sender: "user" | "coach";
-  timestamp: Date;
-}
+import { useAuth } from "@/context/AuthContext";
+import { useChatMessages, Message } from "@/hooks/useChatMessages";
 
 const ChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      content: "Good morning! How are you feeling today?",
-      sender: "coach",
-      timestamp: new Date(Date.now() - 60000),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
+  const { getMessages, sendMessage } = useChatMessages();
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      try {
+        const chatMessages = await getMessages();
+        
+        if (chatMessages.length === 0) {
+          // Add initial welcome message if no messages exist
+          const welcomeMessage: Message = {
+            id: "welcome",
+            content: "Good morning! How are you feeling today?",
+            sender: "coach",
+            timestamp: new Date()
+          };
+          setMessages([welcomeMessage]);
+          
+          // Save the welcome message to the database
+          await sendMessage(welcomeMessage.content, welcomeMessage.sender);
+        } else {
+          setMessages(chatMessages);
+        }
+      } catch (error) {
+        console.error("Error loading messages:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadMessages();
+  }, [user]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,34 +61,51 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (inputText.trim() === "") return;
 
-    const newUserMessage: Message = {
-      id: Date.now().toString(),
+    // Create a temporary message with a temporary ID
+    const tempUserMessage: Message = {
+      id: `temp-${Date.now()}`,
       content: inputText,
       sender: "user",
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, newUserMessage]);
+    setMessages((prev) => [...prev, tempUserMessage]);
     setInputText("");
     
     // Simulate coach typing
     setIsTyping(true);
     
-    // Simulate coach response after a delay
-    setTimeout(() => {
-      const coachReply: Message = {
-        id: (Date.now() + 1).toString(),
-        content: generateCoachResponse(inputText),
-        sender: "coach",
-        timestamp: new Date(),
-      };
+    try {
+      // Save user message to database
+      const savedUserMessage = await sendMessage(inputText, "user");
       
-      setMessages((prev) => [...prev, coachReply]);
+      if (savedUserMessage) {
+        // Replace the temporary message with the saved one
+        setMessages((prev) => 
+          prev.map(msg => msg.id === tempUserMessage.id ? savedUserMessage : msg)
+        );
+      }
+      
+      // Simulate coach response after a delay
+      setTimeout(async () => {
+        const responseContent = generateCoachResponse(inputText);
+        
+        // Save coach message to database
+        const savedCoachMessage = await sendMessage(responseContent, "coach");
+        
+        if (savedCoachMessage) {
+          setMessages((prev) => [...prev, savedCoachMessage]);
+        }
+        
+        setIsTyping(false);
+      }, 1500);
+    } catch (error) {
+      console.error("Error handling message:", error);
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleVoiceInput = (transcript: string) => {
@@ -83,6 +125,17 @@ const ChatInterface = () => {
     
     return responses[Math.floor(Math.random() * responses.length)];
   };
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-2 text-sm text-muted-foreground">Loading your chat...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col">

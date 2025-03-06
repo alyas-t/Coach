@@ -1,48 +1,27 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import GoalCard from "./GoalCard";
 import ProgressChart from "./ProgressChart";
 import DailyCheckIn from "./DailyCheckIn";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
-import { Plus, Calendar, MessageSquare } from "lucide-react";
+import { Plus, Calendar, MessageSquare, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// Mock data - in a real app this would come from a database
-const mockGoals = [
-  {
-    id: "1",
-    title: "Morning exercise routine",
-    description: "Complete 30 minutes of cardio",
-    type: "daily",
-    progress: 0.75,
-    daysCompleted: 5,
-    streak: 5,
-  },
-  {
-    id: "2",
-    title: "Read for personal development",
-    description: "Read 20 pages daily",
-    type: "daily",
-    progress: 0.5,
-    daysCompleted: 3,
-    streak: 3,
-  },
-  {
-    id: "3",
-    title: "Practice mindfulness",
-    description: "15 minutes of meditation",
-    type: "daily",
-    progress: 0.25,
-    daysCompleted: 2,
-    streak: 0,
-  },
-];
+import { useAuth } from "@/context/AuthContext";
+import { useGoals } from "@/hooks/useGoals";
+import { useProfile } from "@/hooks/useProfile";
 
 const Dashboard = () => {
-  const [goals, setGoals] = useState(mockGoals);
+  const [goals, setGoals] = useState([]);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  const { user } = useAuth();
+  const { getGoals } = useGoals();
+  const { getProfile } = useProfile();
+  
   const today = new Date();
   const formattedDate = today.toLocaleDateString("en-US", {
     weekday: "long",
@@ -50,15 +29,45 @@ const Dashboard = () => {
     day: "numeric",
   });
 
-  const userFirstName = "Alex"; // This would come from the user profile
+  useEffect(() => {
+    async function loadData() {
+      if (!user) return;
+      
+      setLoading(true);
+      try {
+        const goalsData = await getGoals();
+        setGoals(goalsData);
+        
+        const profileData = await getProfile();
+        setProfile(profileData);
+      } catch (error) {
+        console.error("Error loading dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, [user]);
 
   const updateGoalProgress = (id: string, progress: number) => {
     setGoals(
-      goals.map((goal) =>
+      goals.map((goal: any) =>
         goal.id === id ? { ...goal, progress } : goal
       )
     );
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -66,7 +75,7 @@ const Dashboard = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-medium tracking-tight">
-              Hello, {userFirstName}
+              Hello, {profile?.name || "there"}
             </h1>
             <p className="text-muted-foreground">
               {formattedDate} • <Badge variant="outline">Week 1</Badge>
@@ -96,16 +105,30 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
-          {goals.map((goal) => (
-            <motion.div
-              key={goal.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: parseInt(goal.id) * 0.1 }}
-            >
-              <GoalCard goal={goal} updateProgress={updateGoalProgress} />
-            </motion.div>
-          ))}
+          {goals.length > 0 ? (
+            goals.map((goal: any, index) => (
+              <motion.div
+                key={goal.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+              >
+                <GoalCard 
+                  goal={goal} 
+                  onProgressUpdate={updateGoalProgress} 
+                />
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-3 py-10 text-center">
+              <p className="text-muted-foreground">
+                You haven't set up any goals yet.
+              </p>
+              <Button variant="outline" className="mt-4 gap-1">
+                <Plus className="h-4 w-4" /> Add Your First Goal
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -115,7 +138,15 @@ const Dashboard = () => {
             <CardTitle>Weekly Progress</CardTitle>
           </CardHeader>
           <CardContent>
-            <ProgressChart data={goals} />
+            {goals.length > 0 ? (
+              <ProgressChart data={goals} />
+            ) : (
+              <div className="h-48 flex items-center justify-center">
+                <p className="text-muted-foreground">
+                  No goals to display progress
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

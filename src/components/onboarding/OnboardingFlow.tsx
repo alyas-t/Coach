@@ -1,12 +1,18 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import PersonalDetailsForm from "./PersonalDetailsForm";
 import GoalSettingForm from "./GoalSettingForm";
 import CoachPersonalityForm from "./CoachPersonalityForm";
 import animations from "@/utils/animation";
-import { CheckIcon } from "lucide-react";
+import { CheckIcon, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useFocusAreas } from "@/hooks/useFocusAreas";
+import { useGoals } from "@/hooks/useGoals";
+import { useCoachSettings } from "@/hooks/useCoachSettings";
+import { toast } from "sonner";
 
 const steps = [
   { id: 1, name: "Personal Details" },
@@ -24,7 +30,20 @@ const OnboardingFlow = () => {
     coachStyle: "supportive",
     coachTone: "friendly",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { updateProfile } = useProfile();
+  const { saveFocusAreas } = useFocusAreas();
+  const { saveGoals } = useGoals();
+  const { saveCoachSettings } = useCoachSettings();
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+    }
+  }, [user, navigate]);
 
   const updateFormData = (data: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
@@ -34,15 +53,46 @@ const OnboardingFlow = () => {
     if (currentStep < steps.length) {
       setCurrentStep((prev) => prev + 1);
     } else {
-      // Save data and redirect to dashboard
-      console.log("Form submitted:", formData);
-      navigate("/dashboard");
+      handleSubmitOnboarding();
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep((prev) => prev - 1);
+    }
+  };
+
+  const handleSubmitOnboarding = async () => {
+    if (!user) return;
+    
+    setIsSubmitting(true);
+    try {
+      // Update profile
+      await updateProfile({
+        name: formData.name,
+        age: parseInt(formData.age as string)
+      });
+      
+      // Save focus areas
+      await saveFocusAreas(formData.focusAreas as string[]);
+      
+      // Save goals
+      await saveGoals(formData.goals as any[]);
+      
+      // Save coach settings
+      await saveCoachSettings({
+        coachStyle: formData.coachStyle,
+        coachTone: formData.coachTone
+      });
+      
+      toast.success("Onboarding completed successfully!");
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error submitting onboarding data:", error);
+      toast.error("There was an error saving your data. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -102,6 +152,15 @@ const OnboardingFlow = () => {
 
       {/* Step Content */}
       <div className="glass-card rounded-xl p-6 md:p-8 relative overflow-hidden">
+        {isSubmitting && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+            <div className="flex flex-col items-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="mt-2 text-sm text-muted-foreground">Saving your information...</p>
+            </div>
+          </div>
+        )}
+        
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}
