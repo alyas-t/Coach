@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,15 +22,26 @@ const steps = [
   { id: 3, name: "Coach Personality" },
 ];
 
+interface OnboardingFormData {
+  name: string;
+  age: string;
+  focusAreas: string[];
+  goals: any[];
+  coachStyle: string;
+  coachTone: string;
+  intensity: number;
+}
+
 const OnboardingFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<OnboardingFormData>({
     name: "",
     age: "",
     focusAreas: [],
     goals: [],
     coachStyle: "supportive",
     coachTone: "friendly",
+    intensity: 3,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +59,7 @@ const OnboardingFlow = () => {
     }
   }, [user, navigate]);
 
-  const updateFormData = (data: Partial<typeof formData>) => {
+  const updateFormData = (data: Partial<OnboardingFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
@@ -74,33 +84,27 @@ const OnboardingFlow = () => {
     setError(null);
     
     try {
-      // Update profile
       await updateProfile({
         name: formData.name,
         age: parseInt(formData.age as string)
       });
       
-      // Save focus areas
       if (formData.focusAreas && formData.focusAreas.length > 0) {
-        await saveFocusAreas(formData.focusAreas as string[]);
+        await saveFocusAreas(formData.focusAreas);
       }
       
-      // Save goals
       if (formData.goals && formData.goals.length > 0) {
-        await saveGoals(formData.goals as any[]);
+        await saveGoals(formData.goals);
       }
       
-      // Save coach settings
       await saveCoachSettings({
         coachStyle: formData.coachStyle,
         coachTone: formData.coachTone,
         intensity: formData.intensity || 3
       });
       
-      // Configure text-to-speech based on coach personality
       const textToSpeech = TextToSpeech.getInstance();
       
-      // Set voice based on chosen personality
       if (formData.coachTone === 'friendly') {
         textToSpeech.setVoicePreference('Samantha');
       } else if (formData.coachTone === 'professional') {
@@ -109,16 +113,13 @@ const OnboardingFlow = () => {
         textToSpeech.setVoicePreference('Microsoft David');
       }
       
-      // Show success toast
       toast.success("Onboarding completed successfully!");
       
-      // Important: Set a small delay before navigating to ensure Supabase has time to process
       setTimeout(() => {
         navigate("/dashboard");
         
-        // Welcome message spoken after navigation
         const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
-          (formData.focusAreas as string[])?.join(', ') || 'personal'
+          formData.focusAreas?.join(', ') || 'personal'
         } goals. Let's get started!`;
         
         setTimeout(() => {
@@ -140,7 +141,6 @@ const OnboardingFlow = () => {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {steps.map((step) => (
@@ -178,7 +178,6 @@ const OnboardingFlow = () => {
                 {step.name}
               </span>
 
-              {/* Connector line */}
               {step.id < steps.length && (
                 <div
                   className={`absolute top-4 left-1/2 w-full h-[2px] ${
@@ -192,7 +191,6 @@ const OnboardingFlow = () => {
         </div>
       </div>
 
-      {/* Step Content */}
       <div className="glass-card rounded-xl p-6 md:p-8 relative overflow-hidden">
         {isSubmitting && (
           <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex items-center justify-center z-50">
