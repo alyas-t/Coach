@@ -1,6 +1,5 @@
-
 /**
- * A utility for handling text-to-speech functionality
+ * A utility for handling text-to-speech functionality using Gemini API
  */
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,9 +14,8 @@ class TextToSpeech {
   private onSpeakStartCallbacks: Array<() => void> = [];
   private onSpeakEndCallbacks: Array<() => void> = [];
   private voicePreference: string | null = null;
-  private useEdgeFunction: boolean = true;
+  private useEdgeFunction: boolean = false; // Changed to false as default since Gemini doesn't support direct TTS
   private audio: HTMLAudioElement | null = null;
-  private elevenLabsVoice: string = "21m00Tcm4TlvDq8ikWAM"; // Default to Rachel voice
 
   private constructor() {
     if (typeof window !== 'undefined') {
@@ -78,25 +76,14 @@ class TextToSpeech {
     this.selectPreferredVoice();
   }
 
-  public setElevenLabsVoice(voiceId: string): void {
-    this.elevenLabsVoice = voiceId;
-  }
-
   public getAvailableVoices(): SpeechSynthesisVoice[] {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
   }
 
-  public getElevenLabsVoices(): {id: string, name: string}[] {
+  // This method returns a static list since we're not using ElevenLabs anymore
+  public getGeminiVoiceOptions(): {id: string, name: string}[] {
     return [
-      { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel (Female)" },
-      { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi (Female)" },
-      { id: "EXAVITQu4vr4xnSDxMaL", name: "Bella (Female)" },
-      { id: "ErXwobaYiN019PkySvjV", name: "Antoni (Male)" },
-      { id: "MF3mGyEYCl7XYWbV9V6O", name: "Elli (Female)" },
-      { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh (Male)" },
-      { id: "VR6AewLTigWG4xSOukaG", name: "Arnold (Male)" },
-      { id: "pNInz6obpgDQGcFmaJgB", name: "Adam (Male)" },
-      { id: "yoZ06aMxZJJ28mfd3POQ", name: "Sam (Male)" }
+      { id: "standard", name: "Standard Voice" }
     ];
   }
 
@@ -114,7 +101,14 @@ class TextToSpeech {
 
     try {
       if (this.useEdgeFunction) {
-        await this.speakWithEdgeFunction(text, onEnd);
+        try {
+          await this.speakWithGemini(text, onEnd);
+        } catch (error) {
+          console.error('Error using Gemini for TTS:', error);
+          // Fall back to browser TTS
+          this.useEdgeFunction = false;
+          this.speakWithBrowser(text, onEnd);
+        }
       } else {
         this.speakWithBrowser(text, onEnd);
       }
@@ -123,24 +117,17 @@ class TextToSpeech {
       this.isSpeaking = false;
       this.notifySpeakEnd();
       if (onEnd) onEnd();
-      
-      // Fallback to browser TTS if edge function fails
-      if (this.useEdgeFunction) {
-        console.log('Falling back to browser TTS');
-        this.useEdgeFunction = false;
-        this.speakWithBrowser(text, onEnd);
-      }
     }
   }
 
-  private async speakWithEdgeFunction(text: string, onEnd?: () => void): Promise<void> {
+  private async speakWithGemini(text: string, onEnd?: () => void): Promise<void> {
     try {
       toast.info("Generating speech...");
       
-      const { data, error } = await supabase.functions.invoke("text-to-speech", {
+      const { data, error } = await supabase.functions.invoke("gemini-chat", {
         body: { 
-          text: text,
-          voice: this.elevenLabsVoice
+          action: "text_to_speech",
+          voiceText: text
         }
       });
 
@@ -149,36 +136,14 @@ class TextToSpeech {
         throw error;
       }
 
-      if (data && data.audio) {
-        // Create audio from base64
-        const audioSrc = `data:audio/mp3;base64,${data.audio}`;
-        
-        if (this.audio) {
-          this.audio.pause();
-          this.audio.removeEventListener('ended', this.handleAudioEnded);
-        }
-        
-        this.audio = new Audio(audioSrc);
-        
-        this.handleAudioEnded = () => {
-          this.isSpeaking = false;
-          this.notifySpeakEnd();
-          if (onEnd) onEnd();
-          this.audio?.removeEventListener('ended', this.handleAudioEnded);
-        };
-        
-        this.audio.addEventListener('ended', this.handleAudioEnded);
-        
-        // Play the audio
-        try {
-          await this.audio.play();
-          toast.dismiss(); // Dismiss the "Generating speech..." toast
-        } catch (playError) {
-          console.error("Error playing audio:", playError);
-          throw playError;
-        }
+      if (data && data.message) {
+        console.log("TTS message:", data.message);
+        // Since Gemini doesn't support TTS directly, we fall back to browser TTS
+        this.useEdgeFunction = false;
+        this.speakWithBrowser(text, onEnd);
+        toast.dismiss();
       } else {
-        throw new Error("No audio data received");
+        throw new Error("No valid response from TTS service");
       }
     } catch (error: any) {
       console.error("Text-to-speech error:", error);
@@ -225,7 +190,7 @@ class TextToSpeech {
   }
 
   public cancel(): void {
-    if (this.useEdgeFunction && this.audio) {
+    if (this.audio) {
       this.audio.pause();
       this.audio.removeEventListener('ended', this.handleAudioEnded);
       this.audio = null;

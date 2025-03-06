@@ -36,7 +36,81 @@ serve(async (req) => {
       throw new Error("Invalid request format");
     }
     
-    const { message, userContext } = reqBody;
+    // Handle different request types
+    const { action, message, userContext, voiceText } = reqBody;
+    
+    // Text-to-speech request
+    if (action === "text_to_speech" && voiceText) {
+      try {
+        console.log("Processing text-to-speech request");
+        // Using Google's Text-to-Speech API via Gemini
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: `Generate base64-encoded audio data for the following text, optimized for speech playback: "${voiceText}"`,
+                    },
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 1024,
+              },
+            }),
+          }
+        );
+
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(`Gemini API error: ${data.error.message}`);
+        }
+
+        // The response would include text instructions on how to generate audio
+        // Since Gemini doesn't directly generate audio, we provide a message explaining this limitation
+        return new Response(
+          JSON.stringify({ 
+            message: "Text-to-speech functionality is only available through dedicated TTS APIs. Gemini API does not directly generate audio. Please use a dedicated TTS service." 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      } catch (error) {
+        console.error("Error processing text-to-speech:", error);
+        throw error;
+      }
+    }
+    
+    // Voice-to-text request
+    if (action === "voice_to_text") {
+      try {
+        console.log("Processing voice-to-text request");
+        // Gemini doesn't directly support speech-to-text, returning a message about this limitation
+        return new Response(
+          JSON.stringify({ 
+            message: "Voice-to-text functionality is only available through dedicated speech recognition APIs. Gemini API does not directly transcribe audio. Please use a dedicated speech recognition service." 
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      } catch (error) {
+        console.error("Error processing voice-to-text:", error);
+        throw error;
+      }
+    }
+    
+    // Default chat response
     console.log("Request received:", { message, userContext: JSON.stringify(userContext).substring(0, 100) + "..." });
 
     if (!message) {

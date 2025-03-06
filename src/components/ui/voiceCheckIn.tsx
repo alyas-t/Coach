@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, Loader2 } from "lucide-react";
@@ -11,105 +12,97 @@ interface VoiceCheckInProps {
 const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const timeoutRef = useRef<number | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const transcriptRef = useRef<string>("");
 
+  // Use browser's built-in speech recognition
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        toast.error("Your browser doesn't support speech recognition. Please try a different browser.");
+        return;
+      }
+      
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      
+      // Reset the transcript
+      transcriptRef.current = "";
+      
+      recognitionRef.current.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        transcriptRef.current = transcript;
+      };
+      
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        if (event.error === 'not-allowed') {
+          toast.error("Microphone access denied. Please allow microphone access to use voice input.");
+        } else {
+          toast.error(`Recognition error: ${event.error}`);
+        }
+        setIsRecording(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        if (isRecording) {
+          // Auto-submit on stop
+          submitTranscription();
         }
       };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await transcribeAudio(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
-      };
-
-      mediaRecorder.start();
+      
+      recognitionRef.current.start();
       setIsRecording(true);
+      
+      // Auto-stop after 30 seconds
+      timeoutRef.current = window.setTimeout(() => {
+        if (isRecording) {
+          stopRecording();
+        }
+      }, 30000);
     } catch (error) {
-      console.error("Error accessing microphone:", error);
-      toast.error("Could not access microphone. Please check your permissions.");
+      console.error("Error starting speech recognition:", error);
+      toast.error("Could not start speech recognition");
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
     }
-  };
-
-  const clearTimeout = () => {
+    
     if (timeoutRef.current) {
       window.clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    
+    setIsRecording(false);
   };
 
-  const transcribeAudio = async (audioBlob: Blob) => {
+  const submitTranscription = async () => {
+    if (!transcriptRef.current.trim()) {
+      toast.error("No speech detected. Please try again.");
+      return;
+    }
+    
+    // For backup, try to use Gemini to process the transcript
     setIsTranscribing(true);
     
-    timeoutRef.current = window.setTimeout(() => {
-      setIsTranscribing(false);
-      toast.error("Transcription is taking too long. Please try again.");
-    }, 20000); // 20 seconds timeout
-    
     try {
-      const reader = new FileReader();
-      
-      reader.onloadend = async () => {
-        try {
-          if (!reader.result) {
-            throw new Error("Failed to read audio file");
-          }
-          
-          const base64Audio = (reader.result as string).split(',')[1];
-          
-          console.log("Sending audio to voice-to-text function");
-          
-          const { data, error } = await supabase.functions.invoke("voice-to-text", {
-            body: { audio: base64Audio }
-          });
-          
-          clearTimeout();
-          
-          if (error) {
-            console.error("Supabase function error:", error);
-            throw new Error(`Edge function error: ${error.message || "Unknown error"}`);
-          }
-          
-          console.log("Received transcription response:", data);
-          
-          if (data && data.text) {
-            onTranscription(data.text);
-            toast.success("Voice transcribed successfully");
-          } else {
-            toast.error("No transcription received");
-          }
-        } catch (error: any) {
-          console.error("Transcription error:", error);
-          toast.error("Failed to transcribe audio: " + (error.message || "Unknown error"));
-        } finally {
-          clearTimeout();
-          setIsTranscribing(false);
-        }
-      };
-      
-      reader.readAsDataURL(audioBlob);
+      // Try using the built-in transcript first
+      onTranscription(transcriptRef.current);
+      toast.success("Voice transcribed successfully");
     } catch (error: any) {
-      console.error("Error processing audio:", error);
-      toast.error("Failed to process audio: " + (error.message || "Unknown error"));
-      clearTimeout();
+      console.error("Error with transcription:", error);
+      toast.error("Failed to transcribe: " + (error.message || "Unknown error"));
+    } finally {
       setIsTranscribing(false);
     }
   };

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -212,14 +211,12 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
     setTranscript("");
     setIsProcessing(true);
     
-    // Use a longer timeout for longer messages
     const timeoutDuration = Math.max(20000, message.length * 100);
     
     const timeout = window.setTimeout(() => {
       processingRetryCount.current += 1;
       
       if (processingRetryCount.current <= 1) {
-        // First timeout - let's try again with a shorter message
         toast.error("AI response is taking longer than expected. Retrying with a shorter message.");
         const shorterMessage = message.length > 100 
           ? message.substring(0, 100) + "..."
@@ -230,7 +227,6 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
           setTranscript(shorterMessage);
         }, 1000);
       } else {
-        // Second timeout - give up
         toast.error("AI response is taking too long. Please try again with a simpler message.");
         setIsProcessing(false);
         processingRetryCount.current = 0;

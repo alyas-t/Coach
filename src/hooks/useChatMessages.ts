@@ -185,10 +185,10 @@ export function useChatMessages() {
     };
   };
 
-  // Function to generate a coach response
+  // Function to generate a coach response using only Gemini API
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
-      // Call the Edge Function to get AI response
+      // Call the Edge Function to get AI response from Gemini
       const { data, error } = await supabase.functions.invoke('gemini-chat', {
         body: {
           message: userMessage,
