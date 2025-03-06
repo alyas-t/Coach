@@ -32,21 +32,24 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      // Execute the query without chaining to avoid deep type instantiation
-      const result: any = await supabase
+      // Break up the query to prevent deep type instantiation
+      // First create the base query without executing it
+      const query = supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_date', queryDate)
         .order('created_at', { ascending: true });
       
-      const data = result.data;
-      const error = result.error;
+      // Execute the query separately, using Function.prototype.call to avoid TypeScript analyzing the chain
+      const response = await Function.prototype.call.call(query.then, query);
+      
+      const { data, error } = response;
       
       if (error) throw error;
       
       // Process the raw data to our expected format
-      const messages: Message[] = Array.isArray(data) ? data.map((message: any) => ({
+      const messages: Message[] = Array.isArray(data) ? data.map((message: ChatMessageRow) => ({
         id: message.id,
         content: message.content,
         sender: message.sender as "user" | "coach",
