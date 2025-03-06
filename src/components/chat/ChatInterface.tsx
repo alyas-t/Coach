@@ -3,9 +3,10 @@ import { useState, useRef, useEffect } from "react";
 import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
 import VoiceChatModal from "./VoiceChatModal";
+import ChatHistory from "./ChatHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings, Loader2, Volume2, VolumeX, Headphones } from "lucide-react";
+import { Mic, Send, Settings, Loader2, Volume2, VolumeX, Headphones, History } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
@@ -19,14 +20,16 @@ const ChatInterface = () => {
   const [inputText, setInputText] = useState("");
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isVoiceChatOpen, setIsVoiceChatOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [lastChatDate, setLastChatDate] = useState<string | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const { getMessages, sendMessage, generateCoachResponse } = useChatMessages();
+  const { getMessages, sendMessage, generateCoachResponse, clearTodaysMessages } = useChatMessages();
   const { getProfile } = useProfile();
   const navigate = useNavigate();
   const tts = useRef(TextToSpeech.getInstance());
@@ -40,12 +43,30 @@ const ChatInterface = () => {
     const loadMessages = async () => {
       setIsLoading(true);
       try {
-        const chatMessages = await getMessages();
         const profile = await getProfile();
         setUserProfile(profile);
         
+        // Get today's date
+        const today = new Date().toISOString().split('T')[0];
+        
+        // Check if we've already loaded messages today
+        const storedChatDate = localStorage.getItem('last_chat_date');
+        setLastChatDate(storedChatDate);
+        
+        // If the stored date is different from today, reset the chat
+        if (storedChatDate !== today) {
+          console.log("New day detected, resetting chat");
+          // This will clear today's messages if they exist
+          await clearTodaysMessages();
+          localStorage.setItem('last_chat_date', today);
+          setLastChatDate(today);
+        }
+        
+        // Now load today's messages
+        const chatMessages = await getMessages();
+        
         if (chatMessages.length === 0) {
-          // Add personalized welcome message if no messages exist
+          // Add personalized welcome message if no messages exist for today
           const welcomeMessage = profile?.name 
             ? `Hello ${profile.name}! How are you feeling today?` 
             : "Good morning! How are you feeling today?";
@@ -260,18 +281,26 @@ const ChatInterface = () => {
               variant="outline"
               size="icon" 
               className="shrink-0"
+              onClick={() => setIsHistoryOpen(true)}
+              title="Chat history"
             >
-              <Settings className="h-5 w-5 text-muted-foreground" />
+              <History className="h-5 w-5 text-muted-foreground" />
             </Button>
           </div>
         </div>
       )}
 
-      <VoiceChatModal 
-        isOpen={isVoiceChatOpen} 
-        onClose={() => setIsVoiceChatOpen(false)} 
-        onSendMessage={handleSendMessage}
-      />
+      {isVoiceChatOpen && (
+        <VoiceChatModal 
+          isOpen={isVoiceChatOpen} 
+          onClose={() => setIsVoiceChatOpen(false)} 
+          onSendMessage={handleSendMessage}
+        />
+      )}
+
+      {isHistoryOpen && (
+        <ChatHistory onClose={() => setIsHistoryOpen(false)} />
+      )}
     </div>
   );
 };

@@ -3,15 +3,20 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock } from "lucide-react";
+import { Clock, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import MorningPlanning from "./MorningPlanning";
 import EveningReflection from "./EveningReflection";
 
 const UpcomingCheckIns = () => {
   const [checkIns, setCheckIns] = useState<any[]>([]);
   const [selectedCheckIn, setSelectedCheckIn] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<any>({
+    morningTime: "08:00",
+    eveningTime: "20:00"
+  });
   const { user } = useAuth();
   
   useEffect(() => {
@@ -33,69 +38,145 @@ const UpcomingCheckIns = () => {
       setCheckIns(data || []);
     };
     
+    const fetchUserSettings = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('morning_time, evening_time')
+        .eq('id', user.id)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching user settings:", error);
+        return;
+      }
+      
+      if (data) {
+        setUserSettings({
+          morningTime: data.morning_time || "08:00",
+          eveningTime: data.evening_time || "20:00"
+        });
+      }
+    };
+    
     fetchCheckIns();
+    fetchUserSettings();
   }, [user]);
 
   const getUpcomingCheckIns = () => {
     const currentHour = new Date().getHours();
+    const currentMinutes = new Date().getMinutes();
     const upcomingCheckIns = [];
     
     const morningCheckIn = checkIns.find(c => c.check_in_type === 'morning');
     const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
     
-    if (currentHour < 12) {
-      if (!morningCheckIn || !morningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'morning',
-          title: 'Morning Planning',
-          time: 'Today at 8:00 AM',
-          active: true
-        });
-      }
+    // Parse time strings
+    const [morningHour, morningMinute] = userSettings.morningTime.split(':').map(Number);
+    const [eveningHour, eveningMinute] = userSettings.eveningTime.split(':').map(Number);
+    
+    const isPastMorningTime = 
+      currentHour > morningHour || 
+      (currentHour === morningHour && currentMinutes >= morningMinute);
       
+    const isPastEveningTime = 
+      currentHour > eveningHour || 
+      (currentHour === eveningHour && currentMinutes >= eveningMinute);
+    
+    // Morning Check-in
+    if (!isPastMorningTime || (!morningCheckIn || !morningCheckIn.completed)) {
+      upcomingCheckIns.push({
+        id: 'morning',
+        title: 'Morning Planning',
+        time: `Today at ${userSettings.morningTime}`,
+        active: !isPastMorningTime || (!morningCheckIn || !morningCheckIn.completed)
+      });
+    }
+    
+    // Evening Check-in
+    if (!isPastEveningTime || (!eveningCheckIn || !eveningCheckIn.completed)) {
       upcomingCheckIns.push({
         id: 'evening',
         title: 'Evening Reflection',
-        time: 'Today at 8:00 PM',
-        active: false
+        time: `Today at ${userSettings.eveningTime}`,
+        active: isPastMorningTime && (!isPastEveningTime || (!eveningCheckIn || !eveningCheckIn.completed))
       });
-    } 
-    else if (currentHour < 18) {
-      if (!eveningCheckIn || !eveningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'evening',
-          title: 'Evening Reflection',
-          time: 'Today at 8:00 PM',
-          active: true
-        });
-      }
-      
+    }
+    
+    // If both check-ins are completed or time has passed, show next day's morning check-in
+    if (upcomingCheckIns.length === 0 || (isPastEveningTime && eveningCheckIn && eveningCheckIn.completed)) {
       upcomingCheckIns.push({
         id: 'morning',
         title: 'Morning Planning',
-        time: 'Tomorrow at 8:00 AM',
-        active: false
-      });
-    } 
-    else {
-      if (!eveningCheckIn || !eveningCheckIn.completed) {
-        upcomingCheckIns.push({
-          id: 'evening',
-          title: 'Evening Reflection',
-          time: 'Today at 8:00 PM',
-          active: true
-        });
-      }
-      
-      upcomingCheckIns.push({
-        id: 'morning',
-        title: 'Morning Planning',
-        time: 'Tomorrow at 8:00 AM',
+        time: `Tomorrow at ${userSettings.morningTime}`,
         active: false
       });
     }
     
     return upcomingCheckIns;
+  };
+
+  const scheduleReminder = (checkInType, time) => {
+    // Request notification permission if not granted
+    if (window.Notification && Notification.permission !== "granted") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          setupReminder(checkInType, time);
+        } else {
+          toast.error("Notification permission denied");
+        }
+      });
+    } else if (window.Notification) {
+      setupReminder(checkInType, time);
+    } else {
+      toast.error("Your browser doesn't support notifications");
+    }
+  };
+  
+  const setupReminder = (checkInType, time) => {
+    const [hours, minutes] = time.split(' at ')[1].split(':').map(Number);
+    
+    // Set notification time
+    const now = new Date();
+    const notificationTime = new Date();
+    
+    if (time.includes('Tomorrow')) {
+      notificationTime.setDate(notificationTime.getDate() + 1);
+    }
+    
+    notificationTime.setHours(hours, minutes, 0, 0);
+    
+    // If time has already passed today, don't schedule (unless it's tomorrow)
+    if (notificationTime < now && !time.includes('Tomorrow')) {
+      toast.error("Can't set reminder for a time that has already passed");
+      return;
+    }
+    
+    const timeUntilNotification = notificationTime.getTime() - now.getTime();
+    
+    // Clear any existing reminders
+    const existingReminderId = localStorage.getItem(`${checkInType}_reminder`);
+    if (existingReminderId) {
+      clearTimeout(parseInt(existingReminderId));
+    }
+    
+    // Set new reminder
+    const reminderId = setTimeout(() => {
+      new Notification("Check-in Reminder", {
+        body: checkInType === 'morning' 
+          ? "Time for your Morning Planning!" 
+          : "Time for your Evening Reflection!",
+        icon: "/favicon.ico"
+      });
+    }, timeUntilNotification);
+    
+    localStorage.setItem(`${checkInType}_reminder`, reminderId.toString());
+    
+    const formattedTime = notificationTime.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    toast.success(`Reminder set for ${formattedTime}`);
   };
 
   return (
@@ -142,14 +223,25 @@ const UpcomingCheckIns = () => {
                     {checkIn.time}
                   </p>
                 </div>
-                <Button
-                  variant={checkIn.active ? "default" : "outline"}
-                  size="sm"
-                  className="text-xs h-8 px-3"
-                  onClick={() => setSelectedCheckIn(checkIn.id)}
-                >
-                  {checkIn.active ? "Start" : "Reminder"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 px-3"
+                    onClick={() => scheduleReminder(checkIn.id, checkIn.time)}
+                  >
+                    <Bell className="h-3 w-3 mr-1" />
+                    Reminder
+                  </Button>
+                  <Button
+                    variant={checkIn.active ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs h-8 px-3"
+                    onClick={() => setSelectedCheckIn(checkIn.id)}
+                  >
+                    {checkIn.active ? "Start" : "Preview"}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

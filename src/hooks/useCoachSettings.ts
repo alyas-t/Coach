@@ -7,6 +7,8 @@ interface CoachSettings {
   coachStyle: string;
   coachTone: string;
   intensity?: number;
+  morningTime?: string;
+  eveningTime?: string;
 }
 
 export function useCoachSettings() {
@@ -18,12 +20,19 @@ export function useCoachSettings() {
     
     setIsLoading(true);
     try {
+      const updateData: any = {
+        coach_style: settings.coachStyle,
+        coach_tone: settings.coachTone
+      };
+      
+      // Add optional fields if they exist
+      if (settings.morningTime) updateData.morning_time = settings.morningTime;
+      if (settings.eveningTime) updateData.evening_time = settings.eveningTime;
+      if (settings.intensity) updateData.coach_intensity = settings.intensity;
+      
       const { error } = await supabase
         .from('profiles')
-        .update({
-          coach_style: settings.coachStyle,
-          coach_tone: settings.coachTone
-        })
+        .update(updateData)
         .eq('id', user.id);
 
       if (error) throw error;
@@ -41,7 +50,7 @@ export function useCoachSettings() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('coach_style, coach_tone')
+        .select('coach_style, coach_tone, morning_time, evening_time, coach_intensity')
         .eq('id', user.id)
         .single();
 

@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { 
   Moon, 
   Sun, 
@@ -38,11 +39,13 @@ import {
   Loader2, 
   UserCog, 
   MessageSquare, 
-  Bell 
+  Bell, 
+  Calendar 
 } from "lucide-react";
+import { TimePickerDemo } from "@/components/settings/TimePicker";
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { saveCoachSettings, getCoachSettings, isLoading: isCoachSettingsLoading } = useCoachSettings();
@@ -52,9 +55,12 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTab, setSelectedTab] = useState("coach");
   
-  // Notification settings (just UI, not implemented in backend)
+  // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [morningTime, setMorningTime] = useState("08:00");
+  const [eveningTime, setEveningTime] = useState("20:00");
+  const [notificationSaving, setNotificationSaving] = useState(false);
   
   useEffect(() => {
     if (!user) {
@@ -67,6 +73,10 @@ const Settings = () => {
       if (settings) {
         setCoachStyle(settings.coach_style || "supportive");
         setCoachTone(settings.coach_tone || "friendly");
+        
+        // Load notification times if available
+        if (settings.morning_time) setMorningTime(settings.morning_time);
+        if (settings.evening_time) setEveningTime(settings.evening_time);
       }
     };
     
@@ -85,6 +95,73 @@ const Settings = () => {
       toast.error("Failed to save coach settings");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveNotificationSettings = async () => {
+    setNotificationSaving(true);
+    try {
+      await saveCoachSettings({
+        coachStyle,
+        coachTone,
+        morningTime,
+        eveningTime
+      });
+      
+      // Schedule notifications for the selected times
+      scheduleDailyNotification("morning", morningTime, "Time for your Morning Planning!");
+      scheduleDailyNotification("evening", eveningTime, "Time for your Evening Reflection!");
+      
+      toast.success("Notification settings saved");
+    } catch (error) {
+      console.error("Error saving notification settings:", error);
+      toast.error("Failed to save notification settings");
+    } finally {
+      setNotificationSaving(false);
+    }
+  };
+  
+  const scheduleDailyNotification = (type, time, message) => {
+    // Only attempt to schedule if browser supports notifications
+    if (window.Notification && Notification.permission === "granted") {
+      const [hours, minutes] = time.split(':').map(Number);
+      
+      // Calculate when to send the notification
+      const now = new Date();
+      const scheduledTime = new Date();
+      scheduledTime.setHours(hours, minutes, 0, 0);
+      
+      // If time has already passed today, schedule for tomorrow
+      if (scheduledTime < now) {
+        scheduledTime.setDate(scheduledTime.getDate() + 1);
+      }
+      
+      const timeUntilNotification = scheduledTime.getTime() - now.getTime();
+      
+      // Store the timeout ID in localStorage to be able to clear it later
+      const existingTimeoutId = localStorage.getItem(`${type}_notification_timeout`);
+      if (existingTimeoutId) {
+        clearTimeout(parseInt(existingTimeoutId));
+      }
+      
+      const timeoutId = setTimeout(() => {
+        new Notification("Check-in Reminder", {
+          body: message,
+          icon: "/favicon.ico"
+        });
+        
+        // Schedule next day's notification
+        scheduleDailyNotification(type, time, message);
+      }, timeUntilNotification);
+      
+      localStorage.setItem(`${type}_notification_timeout`, timeoutId.toString());
+      console.log(`Scheduled ${type} notification for ${scheduledTime.toLocaleString()}`);
+    } else if (window.Notification && Notification.permission !== "denied") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          scheduleDailyNotification(type, time, message);
+        }
+      });
     }
   };
   
@@ -215,6 +292,61 @@ const Settings = () => {
               <TabsContent value="notifications" className="space-y-4">
                 <Card>
                   <CardHeader>
+                    <CardTitle>Check-in Times</CardTitle>
+                    <CardDescription>
+                      Customize when you'd like to receive your daily check-ins
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="morning-time">Morning Planning Time</Label>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="morning-time"
+                            type="time"
+                            value={morningTime}
+                            onChange={(e) => setMorningTime(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="evening-time">Evening Reflection Time</Label>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            id="evening-time"
+                            type="time"
+                            value={eveningTime}
+                            onChange={(e) => setEveningTime(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter>
+                    <Button onClick={saveNotificationSettings} disabled={notificationSaving}>
+                      {notificationSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Bell className="mr-2 h-4 w-4" />
+                          Save & Schedule Reminders
+                        </>
+                      )}
+                    </Button>
+                  </CardFooter>
+                </Card>
+                
+                <Card>
+                  <CardHeader>
                     <CardTitle>Notification Settings</CardTitle>
                     <CardDescription>
                       Control how and when you receive notifications
@@ -246,13 +378,27 @@ const Settings = () => {
                         id="push-notifications"
                         checked={pushNotifications}
                         onCheckedChange={setPushNotifications}
+                        onClick={() => {
+                          if (window.Notification && Notification.permission !== "granted") {
+                            Notification.requestPermission();
+                          }
+                        }}
                       />
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Notification Settings
+                    <Button onClick={saveNotificationSettings} disabled={notificationSaving}>
+                      {notificationSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Notification Settings
+                        </>
+                      )}
                     </Button>
                   </CardFooter>
                 </Card>
