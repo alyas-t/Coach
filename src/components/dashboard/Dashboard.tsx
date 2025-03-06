@@ -1,22 +1,25 @@
-
 import { useState, useEffect } from "react";
-import DashboardHeader from "./DashboardHeader";
-import DashboardGoals from "./DashboardGoals";
+import GoalCard from "./GoalCard";
 import WeeklyProgressChart from "./WeeklyProgressChart";
 import DailyCheckIn from "./DailyCheckIn";
 import UpcomingCheckIns from "./UpcomingCheckIns";
 import { motion } from "@/utils/animation";
-import { Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Plus, Calendar, MessageSquare, Loader2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { useGoals } from "@/hooks/useGoals";
 import { useProfile } from "@/hooks/useProfile";
+import AddGoalDialog from "./AddGoalDialog";
 import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [goals, setGoals] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showAddGoal, setShowAddGoal] = useState(false);
   const [checkIns, setCheckIns] = useState<any[]>([]);
   
   const { user } = useAuth();
@@ -63,7 +66,7 @@ const Dashboard = () => {
     }
     
     loadData();
-  }, [user, navigate, getGoals, getProfile]);
+  }, [user, navigate]);
 
   const handleUpdateGoalProgress = async (id: string, progress: number) => {
     try {
@@ -93,6 +96,7 @@ const Dashboard = () => {
 
   const handleAddGoal = (newGoal: any) => {
     setGoals(prev => [...prev, newGoal]);
+    setShowAddGoal(false);
   };
 
   const handleCalendarClick = () => {
@@ -112,24 +116,91 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-      <DashboardHeader 
-        profile={profile} 
-        formattedDate={formattedDate} 
-        handleCalendarClick={handleCalendarClick} 
-      />
+      <header className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-medium tracking-tight">
+              Hello, {profile?.name || "there"}
+            </h1>
+            <p className="text-muted-foreground">
+              {formattedDate} • <Badge variant="outline">Week 1</Badge>
+            </p>
+          </div>
+          <div className="flex gap-2 mt-4 sm:mt-0">
+            <Link to="/chat">
+              <Button className="gap-2" size="sm">
+                <MessageSquare className="h-4 w-4" /> Chat with Coach
+              </Button>
+            </Link>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1"
+              onClick={handleCalendarClick}
+            >
+              <Calendar className="h-4 w-4" /> Calendar
+            </Button>
+          </div>
+        </div>
+      </header>
 
       <DailyCheckIn />
 
-      <DashboardGoals 
-        goals={goals}
-        handleUpdateGoalProgress={handleUpdateGoalProgress}
-        handleAddGoal={handleAddGoal}
-      />
+      <section>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-medium">Your Goals</h2>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="gap-1"
+            onClick={() => setShowAddGoal(true)}
+          >
+            <Plus className="h-4 w-4" /> Add Goal
+          </Button>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {goals.length > 0 ? (
+            goals.map((goal: any, index) => (
+              <motion.div
+                key={goal.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+              >
+                <GoalCard 
+                  goal={goal} 
+                  onProgressUpdate={handleUpdateGoalProgress} 
+                />
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-3 py-10 text-center">
+              <p className="text-muted-foreground">
+                You haven't set up any goals yet.
+              </p>
+              <Button 
+                variant="outline" 
+                className="mt-4 gap-1"
+                onClick={() => setShowAddGoal(true)}
+              >
+                <Plus className="h-4 w-4" /> Add Your First Goal
+              </Button>
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="grid gap-6 md:grid-cols-2">
         <WeeklyProgressChart />
         <UpcomingCheckIns />
       </div>
+
+      <AddGoalDialog 
+        open={showAddGoal} 
+        onOpenChange={setShowAddGoal}
+        onAddGoal={handleAddGoal}
+      />
     </div>
   );
 };
