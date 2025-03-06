@@ -19,6 +19,10 @@ export default class TextToSpeech {
     { id: "pNInz6obpgDQGcFmaJgB", name: "Adam - Inspirational" },
     { id: "yoZ06aMxZJJ28mfd3POQ", name: "Sam - Friendly" }
   ];
+  
+  // Event handlers for speech start and end
+  private speakStartListeners: (() => void)[] = [];
+  private speakEndListeners: (() => void)[] = [];
 
   private constructor() {
     this.synth = window.speechSynthesis;
@@ -47,13 +51,24 @@ export default class TextToSpeech {
   }
   
   private setupUtteranceEvents(utterance: SpeechSynthesisUtterance): void {
+    utterance.onstart = () => {
+      // Notify all listeners that speech has started
+      this.speakStartListeners.forEach(listener => listener());
+    };
+    
     utterance.onend = () => {
+      // Notify all listeners that speech has ended
+      this.speakEndListeners.forEach(listener => listener());
+      
       this.isProcessing = false;
       setTimeout(() => this.processQueue(), 100);
     };
     
     utterance.onerror = (event) => {
       console.error("Speech synthesis error:", event);
+      // Notify all listeners that speech has ended due to error
+      this.speakEndListeners.forEach(listener => listener());
+      
       this.isProcessing = false;
       setTimeout(() => this.processQueue(), 100);
     };
@@ -80,7 +95,31 @@ export default class TextToSpeech {
     }
   }
 
-  public speak(text: string): void {
+  // Add callback for when speech starts
+  public onSpeakStart(callback: () => void): void {
+    this.speakStartListeners.push(callback);
+  }
+  
+  // Add callback for when speech ends
+  public onSpeakEnd(callback: () => void): void {
+    this.speakEndListeners.push(callback);
+  }
+  
+  // Remove callback for when speech starts
+  public offSpeakStart(callback: () => void): void {
+    this.speakStartListeners = this.speakStartListeners.filter(
+      listener => listener !== callback
+    );
+  }
+  
+  // Remove callback for when speech ends
+  public offSpeakEnd(callback: () => void): void {
+    this.speakEndListeners = this.speakEndListeners.filter(
+      listener => listener !== callback
+    );
+  }
+
+  public speak(text: string, callback?: () => void): void {
     if (!this.isEnabled) return;
     
     try {
@@ -110,6 +149,21 @@ export default class TextToSpeech {
       // Set up event handlers
       this.setupUtteranceEvents(utterance);
       
+      // If a callback was provided, add it as an onend listener
+      if (callback) {
+        utterance.onend = (event) => {
+          // First call the regular onend handler
+          this.speakEndListeners.forEach(listener => listener());
+          this.isProcessing = false;
+          
+          // Then call the provided callback
+          callback();
+          
+          // Resume queue processing
+          setTimeout(() => this.processQueue(), 100);
+        };
+      }
+      
       // Add to queue
       this.utteranceQueue.push(utterance);
       
@@ -119,6 +173,7 @@ export default class TextToSpeech {
       }
     } catch (error) {
       console.error("Error in speak function:", error);
+      if (callback) callback();
     }
   }
 
@@ -142,6 +197,16 @@ export default class TextToSpeech {
   
   public isEnabledStatus(): boolean {
     return this.isEnabled;
+  }
+  
+  // Return whether TTS is enabled (alias for isEnabledStatus for compatibility)
+  public getEnabled(): boolean {
+    return this.isEnabled;
+  }
+  
+  // Get available browser voices
+  public getAvailableVoices(): SpeechSynthesisVoice[] {
+    return this.voices;
   }
   
   public getElevenLabsVoices(): any[] {
