@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import GoalCard from "./GoalCard";
 import WeeklyProgressChart from "./WeeklyProgressChart";
@@ -15,7 +14,6 @@ import { useGoals } from "@/hooks/useGoals";
 import { useProfile } from "@/hooks/useProfile";
 import AddGoalDialog from "./AddGoalDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const Dashboard = () => {
   const [goals, setGoals] = useState<any[]>([]);
@@ -23,7 +21,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [checkIns, setCheckIns] = useState<any[]>([]);
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   
   const { user } = useAuth();
   const { getGoals, updateGoalProgress } = useGoals();
@@ -46,27 +43,11 @@ const Dashboard = () => {
     async function loadData() {
       setLoading(true);
       try {
-        // Check if the user has completed onboarding
         const goalsData = await getGoals();
-        
-        if (!goalsData) {
-          console.error("Error loading goals");
-          toast.error("Could not load your goals");
-          return;
-        }
-        
-        setGoals(goalsData || []);
+        setGoals(goalsData);
         
         const profileData = await getProfile();
         setProfile(profileData);
-        
-        // If user has no goals and no coach settings, they need to complete onboarding
-        if ((!goalsData || goalsData.length === 0) && 
-            (!profileData || (!profileData.coach_style && !profileData.coach_tone))) {
-          setNeedsOnboarding(true);
-          navigate('/onboarding');
-          return;
-        }
         
         const today = new Date().toISOString().split('T')[0];
         const { data: checkInsData, error } = await supabase
@@ -75,23 +56,17 @@ const Dashboard = () => {
           .eq('user_id', user.id)
           .eq('check_in_date', today);
           
-        if (error) {
-          console.error("Error loading check-ins:", error);
-          toast.error("Could not load your daily check-ins");
-          return;
-        }
-        
+        if (error) throw error;
         setCheckIns(checkInsData || []);
       } catch (error) {
         console.error("Error loading dashboard data:", error);
-        toast.error("Could not load dashboard data");
       } finally {
         setLoading(false);
       }
     }
     
     loadData();
-  }, [user, navigate, getGoals, getProfile]);
+  }, [user, navigate]);
 
   const handleUpdateGoalProgress = async (id: string, progress: number) => {
     try {
@@ -116,7 +91,6 @@ const Dashboard = () => {
       );
     } catch (error) {
       console.error("Error updating goal progress:", error);
-      toast.error("Could not update goal progress");
     }
   };
 
@@ -128,10 +102,6 @@ const Dashboard = () => {
   const handleCalendarClick = () => {
     navigate('/calendar');
   };
-
-  if (needsOnboarding) {
-    return null; // Will redirect to onboarding in useEffect
-  }
 
   if (loading) {
     return (

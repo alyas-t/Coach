@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,6 @@ const DailyCheckIn = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [responses, setResponses] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState("morning");
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const tts = TextToSpeech.getInstance();
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -47,7 +47,6 @@ const DailyCheckIn = () => {
       if (!user) return;
       
       setIsLoading(true);
-      setError(null);
       try {
         const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
         
@@ -122,35 +121,24 @@ const DailyCheckIn = () => {
             }
           ];
           
-          try {
-            const { data: newCheckIns, error: insertError } = await supabase
-              .from('check_ins')
-              .insert(checkInsToCreate)
-              .select();
-            
-            if (insertError) throw insertError;
-            
-            // Initialize responses for new check-ins
-            const initialResponses: Record<string, string> = {};
-            if (newCheckIns) {
-              newCheckIns.forEach((checkIn: any) => {
-                initialResponses[checkIn.id] = '';
-              });
-              
-              setCheckIns(newCheckIns);
-              setResponses(initialResponses);
-            } else {
-              throw new Error("Failed to create check-ins");
-            }
-          } catch (insertErr) {
-            console.error("Error creating check-ins:", insertErr);
-            setError("Could not create today's check-ins. Please refresh and try again.");
-            toast.error("Could not create daily check-ins");
-          }
+          const { data: newCheckIns, error: insertError } = await supabase
+            .from('check_ins')
+            .insert(checkInsToCreate)
+            .select();
+          
+          if (insertError) throw insertError;
+          
+          // Initialize responses for new check-ins
+          const initialResponses: Record<string, string> = {};
+          newCheckIns.forEach((checkIn: any) => {
+            initialResponses[checkIn.id] = '';
+          });
+          
+          setCheckIns(newCheckIns);
+          setResponses(initialResponses);
         }
       } catch (error) {
         console.error("Error fetching check-ins:", error);
-        setError("Could not load your daily check-ins. Please refresh and try again.");
         toast.error("Could not load your daily check-ins");
       } finally {
         setIsLoading(false);
@@ -377,42 +365,8 @@ const DailyCheckIn = () => {
     );
   }
 
-  if (error) {
-    return (
-      <Card className="border-destructive/20 bg-destructive/5">
-        <CardContent className="p-6">
-          <div className="flex flex-col items-center text-center">
-            <p className="text-destructive mb-4">{error}</p>
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.reload()}
-              className="gap-2"
-            >
-              <ArrowRight className="h-4 w-4" /> Refresh
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (checkIns.length === 0) {
-    return (
-      <Card className="border-primary/20">
-        <CardContent className="p-6">
-          <div className="flex flex-col items-center text-center">
-            <p className="text-muted-foreground mb-4">No check-ins available for today</p>
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.reload()}
-              className="gap-2"
-            >
-              <ArrowRight className="h-4 w-4" /> Refresh
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   // Group check-ins by type

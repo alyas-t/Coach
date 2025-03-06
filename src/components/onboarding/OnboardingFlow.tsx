@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -6,7 +5,7 @@ import PersonalDetailsForm from "./PersonalDetailsForm";
 import GoalSettingForm from "./GoalSettingForm";
 import CoachPersonalityForm from "./CoachPersonalityForm";
 import animations from "@/utils/animation";
-import { CheckIcon, Loader2, AlertCircle } from "lucide-react";
+import { CheckIcon, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useFocusAreas } from "@/hooks/useFocusAreas";
@@ -14,8 +13,6 @@ import { useGoals } from "@/hooks/useGoals";
 import { useCoachSettings } from "@/hooks/useCoachSettings";
 import { toast } from "sonner";
 import TextToSpeech from "@/utils/textToSpeech";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const steps = [
   { id: 1, name: "Personal Details" },
@@ -23,33 +20,17 @@ const steps = [
   { id: 3, name: "Coach Personality" },
 ];
 
-// Explicitly define the interface for the form data
-export interface OnboardingFormData {
-  name: string;
-  age: string;
-  focusAreas: string[];
-  goals: any[];
-  coachStyle: string;
-  coachTone: string;
-  intensity: number;
-}
-
 const OnboardingFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
-  
-  // Ensure the initial state exactly matches the interface
-  const [formData, setFormData] = useState<OnboardingFormData>({
+  const [formData, setFormData] = useState({
     name: "",
     age: "",
     focusAreas: [],
     goals: [],
     coachStyle: "supportive",
     coachTone: "friendly",
-    intensity: 3,
   });
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -64,8 +45,7 @@ const OnboardingFlow = () => {
     }
   }, [user, navigate]);
 
-  // Explicitly type the function parameter
-  const updateFormData = (data: Partial<OnboardingFormData>) => {
+  const updateFormData = (data: Partial<typeof formData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
@@ -87,34 +67,29 @@ const OnboardingFlow = () => {
     if (!user) return;
     
     setIsSubmitting(true);
-    setError(null);
-    
     try {
+      // Update profile
       await updateProfile({
         name: formData.name,
         age: parseInt(formData.age as string)
       });
       
-      if (formData.focusAreas && formData.focusAreas.length > 0) {
-        await saveFocusAreas(formData.focusAreas);
-      }
+      // Save focus areas
+      await saveFocusAreas(formData.focusAreas as string[]);
       
-      if (formData.goals && formData.goals.length > 0) {
-        await saveGoals(formData.goals);
-      }
+      // Save goals
+      await saveGoals(formData.goals as any[]);
       
-      // Make sure intensity is always defined before saving
-      const intensity = typeof formData.intensity === 'number' ? formData.intensity : 3;
-      
-      // Explicitly define the object to match CoachSettings interface
+      // Save coach settings
       await saveCoachSettings({
         coachStyle: formData.coachStyle,
-        coachTone: formData.coachTone,
-        intensity: intensity
+        coachTone: formData.coachTone
       });
       
+      // Configure text-to-speech based on coach personality
       const textToSpeech = TextToSpeech.getInstance();
       
+      // Set voice based on chosen personality
       if (formData.coachTone === 'friendly') {
         textToSpeech.setVoicePreference('Samantha');
       } else if (formData.coachTone === 'professional') {
@@ -123,35 +98,28 @@ const OnboardingFlow = () => {
         textToSpeech.setVoicePreference('Microsoft David');
       }
       
+      // Welcome message
+      const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
+        (formData.focusAreas as string[]).join(', ')
+      } goals. Let's get started!`;
+      
+      // Show success toast and speak welcome message
       toast.success("Onboarding completed successfully!");
       
-      // Adding a small timeout before navigation to ensure all state updates are completed
-      setTimeout(() => {
+      // Speak welcome message and navigate when done
+      textToSpeech.speak(welcomeMessage, () => {
         navigate("/dashboard");
-        
-        const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
-          formData.focusAreas?.join(', ') || 'personal'
-        } goals. Let's get started!`;
-        
-        setTimeout(() => {
-          textToSpeech.speak(welcomeMessage);
-        }, 500);
-      }, 1000);
-    } catch (error: any) {
+      });
+    } catch (error) {
       console.error("Error submitting onboarding data:", error);
-      setError(error.message || "There was an error saving your data. Please try again.");
       toast.error("There was an error saving your data. Please try again.");
       setIsSubmitting(false);
     }
   };
 
-  const handleErrorRetry = () => {
-    setError(null);
-    setIsSubmitting(false);
-  };
-
   return (
     <div className="w-full max-w-3xl mx-auto">
+      {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {steps.map((step) => (
@@ -189,6 +157,7 @@ const OnboardingFlow = () => {
                 {step.name}
               </span>
 
+              {/* Connector line */}
               {step.id < steps.length && (
                 <div
                   className={`absolute top-4 left-1/2 w-full h-[2px] ${
@@ -202,29 +171,15 @@ const OnboardingFlow = () => {
         </div>
       </div>
 
+      {/* Step Content */}
       <div className="glass-card rounded-xl p-6 md:p-8 relative overflow-hidden">
         {isSubmitting && (
-          <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
             <div className="flex flex-col items-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="mt-2 text-sm text-muted-foreground">Saving your information...</p>
             </div>
           </div>
-        )}
-        
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-auto" 
-              onClick={handleErrorRetry}
-            >
-              Try Again
-            </Button>
-          </Alert>
         )}
         
         <AnimatePresence mode="wait">

@@ -1,19 +1,22 @@
-# Welcome to Coach
-
-Personal Coach is designed to help you transform your goals into achievable daily tasks with the help of AI-powered coaching and accountability tools. Our platform adapts to your unique journey, providing personalized guidance and support every step of the way.
-
-Key Features
-AI-Powered Coaching: Get personalized guidance from our AI coach that adapts to your needs and preferences.
-Goal Tracking: Set and track your personal goals with visual progress indicators and streak counters.
-Daily Accountability: Stay on track with morning plans and evening reflections to maintain momentum.
-Weekly Progress Charts: Visualize your progress over time with intuitive charts and analytics.
-Calendar Integration: Keep track of your check-ins and important milestones.
+# Welcome to your Lovable project
 
 ## Project info
 
-**URL**: REDACTED
+**URL**: https://lovable.dev/projects/95d94eeb-947b-462f-bde9-1980e1b1b06d
+
+## How can I edit this code?
+
+There are several ways of editing your application.
+
+**Use Lovable**
+
+Simply visit the [Lovable Project](https://lovable.dev/projects/95d94eeb-947b-462f-bde9-1980e1b1b06d) and start prompting.
+
+Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
+
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
 
 The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
@@ -32,6 +35,21 @@ npm i
 # Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
+
+**Edit a file directly in GitHub**
+
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
+
+**Use GitHub Codespaces**
+
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
+
 ## What technologies are used for this project?
 
 This project is built with .
@@ -42,7 +60,10 @@ This project is built with .
 - shadcn-ui
 - Tailwind CSS
 
-# About the Creator, Alyas Thomas
-Alyas is a self-driven UC Irvine undergraduate software engineering student seeking a bachelor's degree. As a software developer, he is constantly excited to try out new technologies and works hard to create new projects that will ultimately help him learn more!
+## How can I deploy this project?
 
-Personal Coach represents his vision of combining artificial intelligence with personal development to create a tool that can help people achieve their goals and improve their lives.
+Simply open [Lovable](https://lovable.dev/projects/95d94eeb-947b-462f-bde9-1980e1b1b06d) and click on Share -> Publish.
+
+## I want to use a custom domain - is that possible?
+
+We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)

@@ -130,7 +130,7 @@ serve(async (req) => {
       });
     }
     
-    // Add advice on addressing user by name regularly
+    // Include advice on addressing user by name regularly
     systemPrompt += " Address the user by their name regularly throughout your responses to create a more personal connection. Start with a greeting using their name, and use it naturally 1-2 more times in your response.";
     
     // Add guidance about response length and structure

@@ -1,8 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Bell, AlertCircle, RefreshCw } from "lucide-react";
+import { Clock, Bell } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,61 +17,51 @@ const UpcomingCheckIns = () => {
     morningTime: "08:00",
     eveningTime: "20:00"
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   
   useEffect(() => {
     if (!user) return;
     
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch check-ins
-        const today = new Date().toISOString().split('T')[0];
-        const { data, error } = await supabase
-          .from('check_ins')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('check_in_date', today);
-            
-        if (error) {
-          throw error;
-        }
-        
-        setCheckIns(data || []);
-        
-        // Fetch user settings
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('morning_time, evening_time')
-          .eq('id', user.id)
-          .maybeSingle();
+    const fetchCheckIns = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('check_ins')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('check_in_date', today);
           
-        if (profileError) {
-          if (profileError.code !== 'PGRST116') { // Not found is OK, we'll use defaults
-            throw profileError;
-          }
-        }
+      if (error) {
+        console.error("Error fetching check-ins:", error);
+        return;
+      }
+      
+      console.log("Fetched check-ins:", data);
+      setCheckIns(data || []);
+    };
+    
+    const fetchUserSettings = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('morning_time, evening_time')
+        .eq('id', user.id)
+        .single();
         
-        if (profileData) {
-          setUserSettings({
-            morningTime: profileData.morning_time || "08:00",
-            eveningTime: profileData.evening_time || "20:00"
-          });
-        }
-      } catch (error: any) {
-        console.error("Error fetching data:", error);
-        setError(error.message || "Could not load check-ins");
-        toast.error("Could not load upcoming check-ins");
-      } finally {
-        setIsLoading(false);
+      if (error) {
+        console.error("Error fetching user settings:", error);
+        return;
+      }
+      
+      if (data) {
+        console.log("Fetched user settings:", data);
+        setUserSettings({
+          morningTime: data.morning_time || "08:00",
+          eveningTime: data.evening_time || "20:00"
+        });
       }
     };
     
-    fetchData();
+    fetchCheckIns();
+    fetchUserSettings();
   }, [user]);
 
   const getUpcomingCheckIns = () => {
@@ -197,49 +188,6 @@ const UpcomingCheckIns = () => {
     
     toast.success(`Reminder set for ${formattedTime}`);
   };
-
-  if (error) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Upcoming Check-ins</CardTitle>
-          <AlertCircle className="h-4 w-4 text-destructive" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => window.location.reload()}
-              className="gap-2"
-            >
-              <RefreshCw className="h-3 w-3" /> Refresh
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Upcoming Check-ins</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-center items-center p-6">
-            <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <p className="mt-2 text-sm text-muted-foreground">Loading check-ins...</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
