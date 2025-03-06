@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -31,13 +32,16 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      // Avoid TypeScript deep analysis with explicit any
-      const { data, error } = await supabase
+      // Execute the query without chaining to avoid deep type instantiation
+      const result: any = await supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_date', queryDate)
-        .order('created_at', { ascending: true }) as { data: any, error: any };
+        .order('created_at', { ascending: true });
+      
+      const data = result.data;
+      const error = result.error;
       
       if (error) throw error;
       
