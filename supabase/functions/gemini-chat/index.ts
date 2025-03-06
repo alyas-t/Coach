@@ -26,7 +26,7 @@ serve(async (req) => {
     const history = userContext?.messages || [];
     const userProfile = userContext?.profile || {};
     
-    // Create system prompt based on user profile
+    // Create detailed system prompt based on user profile
     let systemPrompt = "You are a personal coach and assistant who helps users with their goals, motivation, and well-being.";
     
     // Add user name if available
@@ -34,48 +34,86 @@ serve(async (req) => {
       systemPrompt += ` Your user's name is ${userProfile.name}.`;
     }
     
-    // Add coaching style if available
+    // Add user age if available for age-appropriate advice
+    if (userProfile.age) {
+      systemPrompt += ` Your user is ${userProfile.age} years old.`;
+    }
+    
+    // Add coaching style with more detailed guidance
     if (userProfile.coach_style) {
       switch(userProfile.coach_style) {
         case 'supportive':
-          systemPrompt += " Your coaching style is supportive. Focus on encouragement, positive reinforcement, and emotional support.";
+          systemPrompt += " Your coaching style is supportive. Focus on encouragement, positive reinforcement, and emotional support. Validate their efforts and help them see their progress. Use phrases like 'You're doing great' and 'I believe in you'.";
           break;
         case 'directive':
-          systemPrompt += " Your coaching style is directive. Provide clear instructions, detailed guidance, and specific action steps.";
+          systemPrompt += " Your coaching style is directive. Provide clear instructions, detailed guidance, and specific action steps. Be straightforward about what they should do. Use phrases like 'You should try' and 'Here's what to do next'.";
           break;
         case 'challenging':
-          systemPrompt += " Your coaching style is challenging. Push the user to step outside their comfort zone, set ambitious goals, and overcome obstacles.";
+          systemPrompt += " Your coaching style is challenging. Push the user to step outside their comfort zone, set ambitious goals, and overcome obstacles. Challenge their limiting beliefs and assumptions. Use phrases like 'I know you can do better' and 'Let's push your limits'.";
           break;
         default:
           systemPrompt += ` Your style is ${userProfile.coach_style}.`;
       }
     }
     
-    // Add communication tone if available
+    // Add communication tone with more detailed guidance
     if (userProfile.coach_tone) {
       switch(userProfile.coach_tone) {
         case 'friendly':
-          systemPrompt += " Your tone is friendly and conversational. Use casual language, show warmth, and be approachable.";
+          systemPrompt += " Your tone is friendly and conversational. Use casual language, show warmth, and be approachable. Be empathetic and understanding. Use a positive, upbeat tone and occasional emojis if appropriate.";
           break;
         case 'professional':
-          systemPrompt += " Your tone is professional. Be straightforward, focused on results, and maintain a certain formality.";
+          systemPrompt += " Your tone is professional. Be straightforward, focused on results, and maintain a certain formality. Use business-like language, clear structure, and avoid being too casual. Maintain a respectful, expert tone throughout.";
           break;
         case 'motivational':
-          systemPrompt += " Your tone is motivational. Be energetic, inspiring, and use language that drives action.";
+          systemPrompt += " Your tone is motivational. Be energetic, inspiring, and use language that drives action. Use powerful, emotionally resonant language to inspire change. Use metaphors and stories to inspire. Be enthusiastic and passionate.";
           break;
         default:
           systemPrompt += ` Your tone is ${userProfile.coach_tone}.`;
       }
     }
     
-    // Add focus areas if available
+    // Add focus areas with specific advice approaches
     if (userProfile.focus_areas && userProfile.focus_areas.length > 0) {
       systemPrompt += ` The user is focused on: ${userProfile.focus_areas.join(', ')}.`;
+      
+      // Add specific guidance for each focus area
+      userProfile.focus_areas.forEach(area => {
+        switch(area) {
+          case 'Health & Fitness':
+            systemPrompt += " For health and fitness, provide actionable exercise tips, nutrition advice, and wellness strategies.";
+            break;
+          case 'Career Growth':
+            systemPrompt += " For career growth, offer professional development advice, networking strategies, and skill-building recommendations.";
+            break;
+          case 'Learning & Education':
+            systemPrompt += " For learning, suggest study techniques, resource recommendations, and ways to apply new knowledge.";
+            break;
+          case 'Relationships':
+            systemPrompt += " For relationships, focus on communication strategies, boundary-setting, and building meaningful connections.";
+            break;
+          case 'Personal Development':
+            systemPrompt += " For personal development, encourage self-reflection, mindfulness practices, and growth mindset approaches.";
+            break;
+          case 'Productivity':
+            systemPrompt += " For productivity, recommend time management techniques, prioritization strategies, and focus-enhancing methods.";
+            break;
+          case 'Finance':
+            systemPrompt += " For finance, suggest budgeting approaches, saving strategies, and mindful spending practices.";
+            break;
+          case 'Mindfulness':
+            systemPrompt += " For mindfulness, offer meditation techniques, present-moment awareness practices, and stress reduction strategies.";
+            break;
+        }
+      });
     }
     
-    // Include advice on addressing user by name
-    systemPrompt += " Address the user by their name occasionally to create a more personal connection.";
-
+    // Include advice on addressing user by name regularly
+    systemPrompt += " Address the user by their name regularly throughout your responses to create a more personal connection. Start with a greeting using their name, and use it naturally 1-2 more times in your response.";
+    
+    // Add guidance about response length and structure
+    systemPrompt += " Keep your responses concise and well-structured - typically 2-4 paragraphs. Break down complex ideas into digestible points. Your advice should be actionable and practical, something they can implement right away.";
+    
     // Prepare messages for the API
     const contents = [
       { role: "user", parts: [{ text: systemPrompt }] },

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,6 +12,7 @@ import { useFocusAreas } from "@/hooks/useFocusAreas";
 import { useGoals } from "@/hooks/useGoals";
 import { useCoachSettings } from "@/hooks/useCoachSettings";
 import { toast } from "sonner";
+import TextToSpeech from "@/utils/textToSpeech";
 
 const steps = [
   { id: 1, name: "Personal Details" },
@@ -86,12 +86,33 @@ const OnboardingFlow = () => {
         coachTone: formData.coachTone
       });
       
+      // Configure text-to-speech based on coach personality
+      const textToSpeech = TextToSpeech.getInstance();
+      
+      // Set voice based on chosen personality
+      if (formData.coachTone === 'friendly') {
+        textToSpeech.setVoicePreference('Samantha');
+      } else if (formData.coachTone === 'professional') {
+        textToSpeech.setVoicePreference('Google UK English Male');
+      } else if (formData.coachTone === 'motivational') {
+        textToSpeech.setVoicePreference('Microsoft David');
+      }
+      
+      // Welcome message
+      const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
+        (formData.focusAreas as string[]).join(', ')
+      } goals. Let's get started!`;
+      
+      // Show success toast and speak welcome message
       toast.success("Onboarding completed successfully!");
-      navigate("/dashboard");
+      
+      // Speak welcome message and navigate when done
+      textToSpeech.speak(welcomeMessage, () => {
+        navigate("/dashboard");
+      });
     } catch (error) {
       console.error("Error submitting onboarding data:", error);
       toast.error("There was an error saving your data. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };

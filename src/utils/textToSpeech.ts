@@ -1,4 +1,3 @@
-
 /**
  * A utility for handling text-to-speech functionality
  */
@@ -11,6 +10,7 @@ class TextToSpeech {
   private enabled: boolean = true;
   private onSpeakStartCallbacks: Array<() => void> = [];
   private onSpeakEndCallbacks: Array<() => void> = [];
+  private voicePreference: string | null = null;
 
   private constructor() {
     this.speechSynthesis = window.speechSynthesis;
@@ -31,10 +31,19 @@ class TextToSpeech {
 
   private loadVoices(): void {
     this.voices = this.speechSynthesis.getVoices();
+    this.selectPreferredVoice();
+  }
+
+  private selectPreferredVoice(): void {
+    // Try to select a preferred English voice based on user preference or defaults
+    let preferVoiceNames = ['Samantha', 'Google UK English Female', 'Microsoft Zira', 'Female'];
     
-    // Try to select a preferred English female voice
-    const preferVoiceNames = ['Samantha', 'Google UK English Female', 'Microsoft Zira', 'Female'];
+    // If user has a specific voice preference, prioritize it
+    if (this.voicePreference) {
+      preferVoiceNames.unshift(this.voicePreference);
+    }
     
+    // Try to find a voice that matches the user's preference
     for (const name of preferVoiceNames) {
       const foundVoice = this.voices.find(voice => 
         voice.name.includes(name) && voice.lang.startsWith('en')
@@ -49,6 +58,15 @@ class TextToSpeech {
     if (!this.preferredVoice) {
       this.preferredVoice = this.voices.find(voice => voice.lang.startsWith('en')) || null;
     }
+  }
+
+  public setVoicePreference(voiceName: string): void {
+    this.voicePreference = voiceName;
+    this.selectPreferredVoice();
+  }
+
+  public getAvailableVoices(): SpeechSynthesisVoice[] {
+    return this.voices.filter(voice => voice.lang.startsWith('en'));
   }
 
   public speak(text: string, onEnd?: () => void): void {
@@ -114,7 +132,6 @@ class TextToSpeech {
     return this.enabled;
   }
 
-  // Add event listeners for speak start/end
   public onSpeakStart(callback: () => void): void {
     this.onSpeakStartCallbacks.push(callback);
   }
@@ -123,7 +140,6 @@ class TextToSpeech {
     this.onSpeakEndCallbacks.push(callback);
   }
 
-  // Remove event listeners
   public offSpeakStart(callback: () => void): void {
     this.onSpeakStartCallbacks = this.onSpeakStartCallbacks.filter(cb => cb !== callback);
   }
@@ -132,7 +148,6 @@ class TextToSpeech {
     this.onSpeakEndCallbacks = this.onSpeakEndCallbacks.filter(cb => cb !== callback);
   }
 
-  // Notify listeners
   private notifySpeakStart(): void {
     this.onSpeakStartCallbacks.forEach(callback => callback());
   }
