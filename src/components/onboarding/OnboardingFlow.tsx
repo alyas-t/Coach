@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,7 +23,8 @@ const steps = [
   { id: 3, name: "Coach Personality" },
 ];
 
-interface OnboardingFormData {
+// Explicitly define the interface for the form data
+export interface OnboardingFormData {
   name: string;
   age: string;
   focusAreas: string[];
@@ -34,6 +36,8 @@ interface OnboardingFormData {
 
 const OnboardingFlow = () => {
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Ensure the initial state exactly matches the interface
   const [formData, setFormData] = useState<OnboardingFormData>({
     name: "",
     age: "",
@@ -43,6 +47,7 @@ const OnboardingFlow = () => {
     coachTone: "friendly",
     intensity: 3,
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -59,6 +64,7 @@ const OnboardingFlow = () => {
     }
   }, [user, navigate]);
 
+  // Explicitly type the function parameter
   const updateFormData = (data: Partial<OnboardingFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }));
   };
@@ -97,10 +103,11 @@ const OnboardingFlow = () => {
         await saveGoals(formData.goals);
       }
       
+      // Explicitly define the object to match CoachSettings interface
       await saveCoachSettings({
         coachStyle: formData.coachStyle,
         coachTone: formData.coachTone,
-        intensity: formData.intensity || 3
+        intensity: formData.intensity // Use the defined property directly
       });
       
       const textToSpeech = TextToSpeech.getInstance();

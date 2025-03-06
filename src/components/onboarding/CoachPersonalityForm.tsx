@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -9,10 +8,11 @@ import { Slider } from "@/components/ui/slider";
 import animations from "@/utils/animation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { OnboardingFormData } from "./OnboardingFlow";
 
 interface CoachPersonalityFormProps {
-  formData: any;
-  updateFormData: (data: any) => void;
+  formData: OnboardingFormData;
+  updateFormData: (data: Partial<OnboardingFormData>) => void;
   onSubmit: () => void;
   onPrev: () => void;
 }
