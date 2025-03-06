@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -120,6 +119,10 @@ const Calendar = () => {
     );
   };
 
+  const completedDayClass = "border-2 border-green-500 rounded-full";
+  const partialDayClass = "border-2 border-amber-500 rounded-full";
+  const pendingDayClass = "border-2 border-dashed border-gray-300 rounded-full";
+
   return (
     <PageTransition>
       <div className="min-h-screen flex flex-col">
@@ -151,27 +154,14 @@ const Calendar = () => {
                   modifiersClassNames={{
                     today: 'bg-primary/10 text-primary font-bold',
                     selected: 'bg-primary text-primary-foreground',
+                    completed: completedDayClass,
+                    partial: partialDayClass,
+                    pending: pendingDayClass,
                   }}
                   modifiers={{
                     completed: (day) => getDayCompletionStatus(day) === 'completed',
                     partial: (day) => getDayCompletionStatus(day) === 'partial',
                     pending: (day) => getDayCompletionStatus(day) === 'pending' && !isToday(day),
-                  }}
-                  styles={{
-                    day: {
-                      '&[data-state="completed"]': {
-                        border: '2px solid #10b981', // green-500
-                        borderRadius: '100%'
-                      },
-                      '&[data-state="partial"]': {
-                        border: '2px solid #f59e0b', // amber-500
-                        borderRadius: '100%'
-                      },
-                      '&[data-state="pending"]': {
-                        border: '2px dashed #d1d5db', // gray-300
-                        borderRadius: '100%'
-                      }
-                    }
                   }}
                 />
               </CardContent>
