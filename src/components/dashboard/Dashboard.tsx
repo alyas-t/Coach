@@ -47,10 +47,10 @@ const Dashboard = () => {
       setLoading(true);
       try {
         // Check if the user has completed onboarding
-        const { data: goalsData, error: goalsError } = await getGoals();
+        const goalsData = await getGoals();
         
-        if (goalsError) {
-          console.error("Error loading goals:", goalsError);
+        if (!goalsData) {
+          console.error("Error loading goals");
           toast.error("Could not load your goals");
           return;
         }
