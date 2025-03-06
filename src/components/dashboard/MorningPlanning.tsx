@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,42 @@ const MorningPlanning = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [planText, setPlanText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingPlan, setExistingPlan] = useState<any>(null);
   const { user } = useAuth();
+
+  // Check for existing morning plan on component mount
+  useEffect(() => {
+    const checkExistingPlan = async () => {
+      if (!user) return;
+      
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await supabase
+          .from('check_ins')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('check_in_date', today)
+          .eq('check_in_type', 'morning')
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error checking existing plan:", error);
+          return;
+        }
+
+        if (data) {
+          setExistingPlan(data);
+          setPlanText(data.response || "");
+          // Auto-open if there's an existing plan
+          setIsOpen(true);
+        }
+      } catch (error) {
+        console.error("Error checking for existing plan:", error);
+      }
+    };
+
+    checkExistingPlan();
+  }, [user]);
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -25,20 +60,7 @@ const MorningPlanning = () => {
     try {
       const today = new Date().toISOString().split('T')[0];
 
-      // Check if a morning check-in already exists for today
-      const { data: existingCheckIn, error: checkError } = await supabase
-        .from('check_ins')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('check_in_date', today)
-        .eq('check_in_type', 'morning')
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
-
-      if (existingCheckIn) {
+      if (existingPlan) {
         // Update existing check-in
         const { error } = await supabase
           .from('check_ins')
@@ -47,7 +69,7 @@ const MorningPlanning = () => {
             completed: true,
             completed_at: new Date().toISOString()
           })
-          .eq('id', existingCheckIn.id);
+          .eq('id', existingPlan.id);
 
         if (error) throw error;
       } else {
@@ -82,7 +104,9 @@ const MorningPlanning = () => {
   return (
     <>
       {!isOpen ? (
-        <Button onClick={() => setIsOpen(true)}>Start Planning</Button>
+        <Button onClick={() => setIsOpen(true)}>
+          {existingPlan ? "Edit Morning Plan" : "Start Planning"}
+        </Button>
       ) : (
         <Card className="w-full">
           <CardHeader>

@@ -2,14 +2,24 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Settings, LogOut, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Header = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const isActive = (path: string) => location.pathname === path;
@@ -38,6 +48,20 @@ const Header = () => {
       e.preventDefault();
       navigate('/dashboard');
     }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  const handleSettingsClick = () => {
+    navigate('/settings');
+    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -87,21 +111,82 @@ const Header = () => {
                 )}
               </Link>
             ))}
+            
+            {user && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  className="rounded-full"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-5 w-5" />
+                  ) : (
+                    <Moon className="h-5 w-5" />
+                  )}
+                </Button>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 rounded-full"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-medium text-primary">
+                          {user?.user_metadata?.name?.charAt(0) || user?.email?.charAt(0) || "U"}
+                        </span>
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleSettingsClick}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </nav>
 
           {/* Mobile Menu Button */}
-          <button
-            type="button"
-            className="md:hidden p-2 rounded-md text-foreground"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
-          >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
+          <div className="md:hidden flex items-center gap-2">
+            {user && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                className="rounded-full"
+              >
+                {theme === "dark" ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+              </Button>
             )}
-          </button>
+            
+            <button
+              type="button"
+              className="p-2 rounded-md text-foreground"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {isMobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -129,6 +214,30 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
+            
+            {user && (
+              <>
+                <div
+                  className="block px-3 py-2 rounded-md text-base font-medium text-foreground/80 hover:bg-primary/5 hover:text-foreground cursor-pointer"
+                  onClick={handleSettingsClick}
+                >
+                  <div className="flex items-center">
+                    <Settings className="mr-2 h-5 w-5" />
+                    Settings
+                  </div>
+                </div>
+                
+                <div
+                  className="block px-3 py-2 rounded-md text-base font-medium text-foreground/80 hover:bg-primary/5 hover:text-foreground cursor-pointer"
+                  onClick={handleSignOut}
+                >
+                  <div className="flex items-center">
+                    <LogOut className="mr-2 h-5 w-5" />
+                    Log out
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </motion.div>
       )}
