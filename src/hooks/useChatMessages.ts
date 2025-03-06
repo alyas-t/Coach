@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -28,7 +27,6 @@ export function useChatMessages() {
         .select('*')
         .eq('user_id', user.id);
       
-      // If date is provided, filter by that date
       if (date) {
         const startOfDay = new Date(date);
         const endOfDay = new Date(date);
@@ -38,7 +36,6 @@ export function useChatMessages() {
           .gte('created_at', startOfDay.toISOString())
           .lt('created_at', endOfDay.toISOString());
       } else {
-        // Default to today's messages
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -98,7 +95,6 @@ export function useChatMessages() {
     if (!user) return "I'm sorry, but you need to be logged in to chat with me.";
     
     try {
-      // Get user profile and focus areas for context
       const profile = await getProfile();
       const focusAreas = await getFocusAreas();
       
@@ -107,22 +103,25 @@ export function useChatMessages() {
           ...profile,
           focus_areas: focusAreas
         },
-        messages: messageHistory.slice(-10) // Send the last 10 messages for context
+        messages: messageHistory.slice(-10)
       };
       
       console.log("Generating response with context:", JSON.stringify(userContext, null, 2));
       
-      // Set up request with timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       try {
         const { data, error } = await supabase.functions.invoke('gemini-chat', {
-          body: { message: userMessage, userContext },
-          signal: controller.signal
+          body: { message: userMessage, userContext }
         });
         
         clearTimeout(timeoutId);
+        
+        if (controller.signal.aborted) {
+          console.error("Gemini chat request timed out");
+          throw new Error('AI response timed out');
+        }
         
         if (error) {
           console.error("Gemini chat function error:", error);
@@ -153,11 +152,9 @@ export function useChatMessages() {
     if (!user) return false;
     
     try {
-      // Get today's date range
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // Check if there are any messages today
       const { data, error } = await supabase
         .from('chat_messages')
         .select('id')
@@ -166,8 +163,6 @@ export function useChatMessages() {
         
       if (error) throw error;
       
-      // If there are messages today, confirm they exist but don't delete them
-      // We'll just start fresh with new messages
       console.log(`Found ${data.length} messages for today`);
       
       return true;
@@ -190,7 +185,6 @@ export function useChatMessages() {
         
       if (error) throw error;
       
-      // Extract unique dates
       const uniqueDates = new Set();
       data.forEach(message => {
         const date = new Date(message.created_at).toISOString().split('T')[0];
