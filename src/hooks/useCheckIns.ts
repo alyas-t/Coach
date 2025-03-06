@@ -71,11 +71,18 @@ export function useCheckIns() {
   const triggerManualCheckIn = async (type: "morning" | "evening" = "morning") => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/daily-check-in`, {
+      // Use the Supabase instance's URL
+      const url = `${supabase.supabaseUrl}/functions/v1/daily-check-in`;
+      
+      // Get the current session
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.getSession()}`
+          'Authorization': `Bearer ${accessToken}`
         },
         body: JSON.stringify({ type })
       });
