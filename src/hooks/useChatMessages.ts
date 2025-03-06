@@ -110,16 +110,40 @@ export function useChatMessages() {
         messages: messageHistory.slice(-10) // Send the last 10 messages for context
       };
       
-      console.log("Generating response with context:", userContext);
+      console.log("Generating response with context:", JSON.stringify(userContext, null, 2));
       
-      const { data, error } = await supabase.functions.invoke('gemini-chat', {
-        body: { message: userMessage, userContext }
-      });
+      // Set up request with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
-      if (error) throw error;
-      
-      return data.response;
-    } catch (error) {
+      try {
+        const { data, error } = await supabase.functions.invoke('gemini-chat', {
+          body: { message: userMessage, userContext },
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (error) {
+          console.error("Gemini chat function error:", error);
+          throw error;
+        }
+        
+        if (!data || !data.response) {
+          console.error("Gemini chat returned invalid response:", data);
+          throw new Error("Invalid response received from AI");
+        }
+        
+        return data.response;
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          console.error("Gemini chat request timed out");
+          throw new Error('AI response timed out');
+        }
+        throw fetchError;
+      }
+    } catch (error: any) {
       console.error("Error generating coach response:", error);
       return "I'm having trouble connecting right now. Please try again later.";
     }

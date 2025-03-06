@@ -14,6 +14,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const timeoutRef = useRef<number | null>(null);
 
   const startRecording = async () => {
     try {
@@ -49,8 +50,22 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
     }
   };
 
+  const clearTimeout = () => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
   const transcribeAudio = async (audioBlob: Blob) => {
     setIsTranscribing(true);
+    
+    // Set a timeout for the transcription process
+    timeoutRef.current = window.setTimeout(() => {
+      setIsTranscribing(false);
+      toast.error("Transcription is taking too long. Please try again.");
+    }, 20000); // 20 seconds timeout
+    
     try {
       // Convert blob to base64
       const reader = new FileReader();
@@ -70,6 +85,8 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
             body: { audio: base64Audio }
           });
           
+          clearTimeout();
+          
           if (error) {
             console.error("Supabase function error:", error);
             throw new Error(`Edge function error: ${error.message || "Unknown error"}`);
@@ -87,6 +104,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
           console.error("Transcription error:", error);
           toast.error("Failed to transcribe audio: " + (error.message || "Unknown error"));
         } finally {
+          clearTimeout();
           setIsTranscribing(false);
         }
       };
@@ -95,6 +113,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
     } catch (error: any) {
       console.error("Error processing audio:", error);
       toast.error("Failed to process audio: " + (error.message || "Unknown error"));
+      clearTimeout();
       setIsTranscribing(false);
     }
   };

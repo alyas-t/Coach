@@ -19,6 +19,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   const [isProcessing, setIsProcessing] = useState(false);
   const [amplitude, setAmplitude] = useState(0);
   const [aiSpeaking, setAiSpeaking] = useState(false);
+  const [processingTimeout, setProcessingTimeout] = useState<number | null>(null);
   
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -76,6 +77,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
     return () => {
       stopListening();
       cleanupAudio();
+      clearProcessingTimeout();
       
       // Clean up TTS listeners
       const ttsInstance = tts.current;
@@ -143,6 +145,13 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
     }
   }, [aiSpeaking, isListening]);
 
+  const clearProcessingTimeout = () => {
+    if (processingTimeout !== null) {
+      clearTimeout(processingTimeout);
+      setProcessingTimeout(null);
+    }
+  };
+
   const setupAudioVisualization = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -208,13 +217,24 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
     setTranscript("");
     setIsProcessing(true);
     
+    // Set a timeout to detect if the processing takes too long
+    const timeout = window.setTimeout(() => {
+      toast.error("AI response is taking longer than expected. Please try again.");
+      setIsProcessing(false);
+    }, 15000); // 15 seconds timeout
+    
+    setProcessingTimeout(timeout);
+    
     try {
+      console.log("Sending transcript to AI:", message);
       // Process the message and get AI response
       await onSendMessage(message);
+      console.log("AI response received successfully");
     } catch (error) {
       console.error("Error processing message:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {
+      clearProcessingTimeout();
       setIsProcessing(false);
     }
   };
@@ -222,6 +242,7 @@ const VoiceChatModal = ({ isOpen, onClose, onSendMessage }: VoiceChatModalProps)
   const handleClose = () => {
     stopListening();
     cleanupAudio();
+    clearProcessingTimeout();
     onClose();
   };
 

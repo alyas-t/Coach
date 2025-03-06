@@ -43,48 +43,91 @@ serve(async (req) => {
   }
 
   try {
-    const { audio } = await req.json()
+    console.log("Processing voice-to-text request");
+    
+    // Parse request body
+    let reqBody;
+    try {
+      reqBody = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid request format");
+    }
+    
+    const { audio } = reqBody;
     
     if (!audio) {
+      console.error("Missing audio data");
       throw new Error('No audio data provided')
     }
 
-    // Process audio in chunks
-    const binaryAudio = processBase64Chunks(audio)
-    
-    // Prepare form data
-    const formData = new FormData()
-    const blob = new Blob([binaryAudio], { type: 'audio/webm' })
-    formData.append('file', blob, 'audio.webm')
-    formData.append('model', 'whisper-1')
-
-    // Send to OpenAI
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-      },
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${await response.text()}`)
+    // Verify that we have the required API key
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      console.error("Missing OPENAI_API_KEY environment variable");
+      throw new Error('OpenAI API key is not configured')
     }
 
-    const result = await response.json()
+    console.log("Processing audio data");
+    
+    // Process audio in chunks
+    const binaryAudio = processBase64Chunks(audio);
+    console.log("Audio processed, binary size:", binaryAudio.length);
+    
+    // Prepare form data
+    const formData = new FormData();
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+    
+    console.log("Sending request to OpenAI");
 
-    return new Response(
-      JSON.stringify({ text: result.text }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    // Send to OpenAI with timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: formData,
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error (${response.status}):`, errorText);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+      }
 
+      const result = await response.json();
+      console.log("Received transcription:", result.text);
+
+      return new Response(
+        JSON.stringify({ text: result.text }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error("OpenAI API request timed out");
+        throw new Error('Transcription request timed out');
+      }
+      throw fetchError;
+    }
   } catch (error) {
+    console.error('Error in voice-to-text function:', error);
+    
     return new Response(
       JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
-    )
+    );
   }
 });

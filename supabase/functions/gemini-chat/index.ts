@@ -19,8 +19,30 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userContext } = await req.json();
-    console.log("Received request:", { message, userContext: JSON.stringify(userContext) });
+    console.log("Gemini chat function received a request");
+    
+    // Verify API key is present
+    if (!GEMINI_API_KEY) {
+      console.error("GEMINI_API_KEY environment variable is not set");
+      throw new Error("GEMINI_API_KEY environment variable is not set");
+    }
+    
+    // Parse request
+    let reqBody;
+    try {
+      reqBody = await req.json();
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error("Invalid request format");
+    }
+    
+    const { message, userContext } = reqBody;
+    console.log("Request received:", { message, userContext: JSON.stringify(userContext).substring(0, 100) + "..." });
+
+    if (!message) {
+      console.error("No message provided in request");
+      throw new Error("Message is required");
+    }
     
     // Prepare history from context if available
     const history = userContext?.messages || [];
@@ -130,32 +152,10 @@ serve(async (req) => {
       });
     }
     
-    // Include advice on addressing user by name regularly
-    systemPrompt += " Address the user by their name regularly throughout your responses to create a more personal connection. Start with a greeting using their name, and use it naturally 1-2 more times in your response.";
+    // Final instructions for concise and helpful responses
+    systemPrompt += " Keep your responses concise and well-structured - typically 2-4 paragraphs. Break down complex ideas into digestible points. Your advice should be actionable and practical, something they can implement right away. IMPORTANT: You must respond within 5-10 seconds. DO NOT provide lengthy responses that would take longer than this to generate.";
     
-    // Add guidance about response length and structure
-    systemPrompt += " Keep your responses concise and well-structured - typically 2-4 paragraphs. Break down complex ideas into digestible points. Your advice should be actionable and practical, something they can implement right away.";
-    
-    // Add different greetings based on coaching style
-    if (userProfile.coach_style) {
-      systemPrompt += " For your initial greeting each day, use:";
-      switch(userProfile.coach_style) {
-        case 'supportive':
-          systemPrompt += " A warm, encouraging opening that shows you're happy to see them and ready to support them in their journey.";
-          break;
-        case 'directive':
-          systemPrompt += " A clear, purposeful opening that sets the tone for productive conversation and helps them focus for the day.";
-          break;
-        case 'challenging':
-          systemPrompt += " An energetic, ambitious opening that immediately gets them thinking about their goals and pushing their limits.";
-          break;
-        case 'analytical':
-          systemPrompt += " A thoughtful, insightful opening that prompts them to reflect on patterns and data from their progress.";
-          break;
-      }
-    }
-    
-    console.log("Using system prompt:", systemPrompt);
+    console.log("Using system prompt:", systemPrompt.substring(0, 200) + "...");
     
     // Prepare messages for the API
     const contents = [
@@ -169,58 +169,70 @@ serve(async (req) => {
 
     console.log("Sending request to Gemini API");
     
-    // Verify that we have a valid API key
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY environment variable is not set");
-    }
+    // Send request to Gemini API with timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout
     
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
         },
-        safetySettings: [
-          {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 500, // Reduced token count for faster responses
           },
-          {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          },
-          {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-          }
-        ]
-      }),
-    });
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_MEDIUM_AND_ABOVE"
+            }
+          ]
+        }),
+      });
+      
+      clearTimeout(timeoutId);
 
-    const data = await response.json();
-    console.log("Gemini API response received");
-    
-    if (!response.ok) {
-      console.error("Gemini API error:", data);
-      throw new Error(data.error?.message || "Error calling Gemini API");
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Gemini API error response:", errorData);
+        throw new Error(`Gemini API error: ${response.status} - ${errorData}`);
+      }
+
+      const data = await response.json();
+      console.log("Gemini API response received");
+      
+      const generatedText = data.candidates[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
+      
+      return new Response(JSON.stringify({ response: generatedText }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        console.error("Gemini API request timed out");
+        throw new Error('AI response generation timed out');
+      }
+      throw fetchError;
     }
-
-    const generatedText = data.candidates[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't generate a response.";
-    
-    return new Response(JSON.stringify({ response: generatedText }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   } catch (error) {
     console.error("Error processing request:", error);
     
