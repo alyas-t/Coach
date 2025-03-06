@@ -40,17 +40,19 @@ const DailyCheckIn = () => {
         }
         
         if (data && data.length > 0) {
-          // Infer check-in type from the question content
+          // Infer check-in type from the question content if not set
           const morningPattern = /morning|plan|today|feeling|goals today/i;
           const eveningPattern = /evening|reflection|went well|how did you do|today's goals/i;
           
           const processedCheckIns = data.map(checkIn => {
-            // Determine type based on question content
-            let type = "morning"; // Default
-            if (eveningPattern.test(checkIn.question)) {
-              type = "evening";
-            } else if (morningPattern.test(checkIn.question)) {
-              type = "morning";
+            // Use existing check_in_type or determine based on question content
+            let type = checkIn.check_in_type || "morning"; // Default
+            if (!checkIn.check_in_type) {
+              if (eveningPattern.test(checkIn.question)) {
+                type = "evening";
+              } else if (morningPattern.test(checkIn.question)) {
+                type = "morning";
+              }
             }
             
             return {

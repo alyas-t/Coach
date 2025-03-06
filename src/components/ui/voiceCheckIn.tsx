@@ -65,6 +65,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
           });
           
           if (error) {
+            console.error("Error invoking voice-to-text function:", error);
             throw error;
           }
           
@@ -72,6 +73,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
             onTranscription(data.text);
             toast.success("Voice transcribed successfully");
           } else {
+            console.error("No transcription received:", data);
             toast.error("No transcription received");
           }
         } catch (error) {

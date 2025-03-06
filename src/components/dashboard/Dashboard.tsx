@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import GoalCard from "./GoalCard";
 import ProgressChart from "./ProgressChart";
@@ -20,6 +21,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showAddGoal, setShowAddGoal] = useState(false);
   const [checkIns, setCheckIns] = useState<any[]>([]);
+  const [showCalendar, setShowCalendar] = useState(false);
   
   const { user } = useAuth();
   const { getGoals, updateGoalProgress } = useGoals();
@@ -160,6 +162,17 @@ const Dashboard = () => {
     return upcomingCheckIns;
   };
 
+  const scrollToCheckIns = () => {
+    const checkInsElement = document.getElementById('daily-check-ins');
+    if (checkInsElement) {
+      checkInsElement.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const openCalendar = () => {
+    navigate('/calendar');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -189,14 +202,16 @@ const Dashboard = () => {
                 <MessageSquare className="h-4 w-4" /> Chat with Coach
               </Button>
             </Link>
-            <Button variant="outline" size="sm" className="gap-1">
+            <Button variant="outline" size="sm" className="gap-1" onClick={openCalendar}>
               <Calendar className="h-4 w-4" /> Calendar
             </Button>
           </div>
         </div>
       </header>
 
-      <DailyCheckIn />
+      <div id="daily-check-ins">
+        <DailyCheckIn />
+      </div>
 
       <section>
         <div className="flex justify-between items-center mb-4">
@@ -292,11 +307,7 @@ const Dashboard = () => {
                     variant={checkIn.active ? "default" : "outline"}
                     size="sm"
                     className="text-xs h-8 px-3"
-                    onClick={() => {
-                      document.querySelector('[data-section="check-ins"]')?.scrollIntoView({
-                        behavior: 'smooth'
-                      });
-                    }}
+                    onClick={scrollToCheckIns}
                   >
                     {checkIn.active ? "Start" : "Reminder"}
                   </Button>
