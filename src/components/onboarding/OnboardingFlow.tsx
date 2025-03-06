@@ -81,15 +81,20 @@ const OnboardingFlow = () => {
       });
       
       // Save focus areas
-      await saveFocusAreas(formData.focusAreas as string[]);
+      if (formData.focusAreas && formData.focusAreas.length > 0) {
+        await saveFocusAreas(formData.focusAreas as string[]);
+      }
       
       // Save goals
-      await saveGoals(formData.goals as any[]);
+      if (formData.goals && formData.goals.length > 0) {
+        await saveGoals(formData.goals as any[]);
+      }
       
       // Save coach settings
       await saveCoachSettings({
         coachStyle: formData.coachStyle,
-        coachTone: formData.coachTone
+        coachTone: formData.coachTone,
+        intensity: formData.intensity || 3
       });
       
       // Configure text-to-speech based on coach personality
@@ -104,19 +109,22 @@ const OnboardingFlow = () => {
         textToSpeech.setVoicePreference('Microsoft David');
       }
       
-      // Welcome message
-      const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
-        (formData.focusAreas as string[]).join(', ')
-      } goals. Let's get started!`;
-      
-      // Show success toast and speak welcome message
+      // Show success toast
       toast.success("Onboarding completed successfully!");
       
-      // Navigate to dashboard and speak welcome message
-      navigate("/dashboard");
+      // Important: Set a small delay before navigating to ensure Supabase has time to process
       setTimeout(() => {
-        textToSpeech.speak(welcomeMessage);
-      }, 500);
+        navigate("/dashboard");
+        
+        // Welcome message spoken after navigation
+        const welcomeMessage = `Hi ${formData.name}! I'm your personal coach. I'm here to help you with your ${
+          (formData.focusAreas as string[])?.join(', ') || 'personal'
+        } goals. Let's get started!`;
+        
+        setTimeout(() => {
+          textToSpeech.speak(welcomeMessage);
+        }, 500);
+      }, 1000);
     } catch (error: any) {
       console.error("Error submitting onboarding data:", error);
       setError(error.message || "There was an error saving your data. Please try again.");

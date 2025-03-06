@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
@@ -21,26 +20,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const fetchSession = async () => {
       try {
+        console.log("Fetching initial session");
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error("Error fetching session:", error);
           setIsLoading(false);
+          setInitialLoad(false);
           return;
         }
         
         setSession(data.session);
         setUser(data.session?.user || null);
+        
+        // Don't redirect on initial load
+        if (data.session?.user && initialLoad) {
+          console.log("User is already logged in:", data.session.user.email);
+        }
       } catch (e) {
         console.error("Exception fetching session:", e);
       } finally {
         setIsLoading(false);
+        setInitialLoad(false);
       }
     };
 
@@ -52,10 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newSession?.user || null);
       
       if (event === 'SIGNED_IN' && newSession) {
-        // Don't set loading again - this prevents infinite loops
+        // Don't set loading again to prevent infinite loops
         try {
-          // Simple basic redirection - this path should never cause errors
-          if (location.pathname === '/' || location.pathname === '/auth') {
+          const currentPath = location.pathname;
+          
+          // Only redirect if on login or home page
+          if (currentPath === '/' || currentPath === '/auth') {
+            console.log("Redirecting to onboarding after sign in");
             navigate('/onboarding');
           }
         } catch (error) {
@@ -69,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, initialLoad]);
 
   const signUp = async (email: string, password: string, name: string) => {
     setIsLoading(true);

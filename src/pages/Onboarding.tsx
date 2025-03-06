@@ -36,46 +36,50 @@ const Onboarding = () => {
           setLoadingTimeout(true);
         }, 5000);
         
-        // Simplified check: we'll just start onboarding if we can't determine status
-        let hasCompletedOnboarding = false;
+        // Try to check if the user already has profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('coach_style, coach_tone')
+          .eq('id', user.id)
+          .maybeSingle();
+          
+        // Clear timeout since we got a response
+        clearTimeout(timeoutId);
         
-        try {
-          // Try to check if the user has any goals set
+        // Check if we got an error from the profile check
+        if (profileError) {
+          console.error("Error checking profile:", profileError);
+          throw new Error(profileError.message);
+        }
+        
+        // If the user has coach settings, check for goals
+        let hasGoals = false;
+        if (profileData && (profileData.coach_style || profileData.coach_tone)) {
           const { data: goals, error: goalsError } = await supabase
             .from('goals')
             .select('id')
             .eq('user_id', user.id)
             .limit(1);
             
-          if (!goalsError && goals && goals.length > 0) {
-            hasCompletedOnboarding = true;
+          if (goalsError) {
+            console.error("Error checking goals:", goalsError);
+          } else {
+            hasGoals = goals && goals.length > 0;
           }
-          
-          // Only check profile if goals check didn't confirm completion
-          if (!hasCompletedOnboarding) {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('coach_style, coach_tone')
-              .eq('id', user.id)
-              .maybeSingle();
-              
-            if (!profileError && profileData && (profileData.coach_style || profileData.coach_tone)) {
-              hasCompletedOnboarding = true;
-            }
-          }
-        } catch (err) {
-          console.error("Error in onboarding checks:", err);
-          // If there's an error, we'll just continue to onboarding
         }
         
-        if (hasCompletedOnboarding) {
+        // If user has both profile settings and goals, they completed onboarding
+        if (profileData && (profileData.coach_style || profileData.coach_tone) && hasGoals) {
+          console.log("User has completed onboarding, redirecting to dashboard");
           navigate('/dashboard');
+        } else {
+          console.log("User needs to complete onboarding");
+          setIsChecking(false);
         }
       } catch (error: any) {
         console.error("Error checking onboarding status:", error);
-        setError(`Could not check onboarding status: ${error.message || "Unknown error"}`);
-      } finally {
         clearTimeout(timeoutId);
+        setError(`Could not check onboarding status: ${error.message || "Unknown error"}`);
         setIsChecking(false);
       }
     };
