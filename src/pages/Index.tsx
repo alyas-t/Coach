@@ -1,3 +1,4 @@
+
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
@@ -26,17 +27,18 @@ const Index = () => {
           
         if (goalsError) throw goalsError;
         
-        // Check if the user has coach settings (another onboarding indicator)
-        const { data: coachSettings, error: settingsError } = await supabase
-          .from('coach_settings')
-          .select('id')
-          .eq('user_id', user.id)
-          .limit(1);
+        // Check if the user has coach settings in their profile (another onboarding indicator)
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('coach_style, coach_tone')
+          .eq('id', user.id)
+          .single();
           
-        if (settingsError) throw settingsError;
+        if (profileError) throw profileError;
         
-        // If user has either goals or coach settings, they've likely completed onboarding
-        if ((goals && goals.length > 0) || (coachSettings && coachSettings.length > 0)) {
+        // If user has either goals or coach settings defined in their profile, they've likely completed onboarding
+        if ((goals && goals.length > 0) || 
+            (profileData && (profileData.coach_style || profileData.coach_tone))) {
           navigate('/dashboard');
         }
       } catch (error) {
