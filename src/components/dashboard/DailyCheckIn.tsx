@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
+import { Check, X, Loader2, ArrowLeft, ArrowRight, Volume2 } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -215,8 +214,13 @@ const DailyCheckIn = () => {
     }
   };
 
-  const handleSpeakQuestion = (question: string) => {
-    tts.speak(question);
+  const handleSpeakQuestion = async (question: string) => {
+    try {
+      await tts.speak(question);
+    } catch (error) {
+      console.error("Error speaking question:", error);
+      toast.error("Failed to speak question. Using browser TTS instead.");
+    }
   };
 
   const handleVoiceTranscription = (checkInId: string, text: string) => {
@@ -257,21 +261,7 @@ const DailyCheckIn = () => {
               onClick={() => handleSpeakQuestion(checkIn.question)}
             >
               <span className="sr-only">Listen</span>
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
-              </svg>
+              <Volume2 className="h-4 w-4" />
             </Button>
           </div>
         </div>

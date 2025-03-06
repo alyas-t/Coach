@@ -57,6 +57,10 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
       
       reader.onloadend = async () => {
         try {
+          if (!reader.result) {
+            throw new Error("Failed to read audio file");
+          }
+          
           const base64Audio = (reader.result as string).split(',')[1];
           
           console.log("Sending audio to voice-to-text function");
@@ -68,7 +72,7 @@ const VoiceCheckIn = ({ onTranscription }: VoiceCheckInProps) => {
           
           if (error) {
             console.error("Supabase function error:", error);
-            throw error;
+            throw new Error(`Edge function error: ${error.message || "Unknown error"}`);
           }
           
           console.log("Received transcription response:", data);
