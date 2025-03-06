@@ -6,21 +6,24 @@ import DailyCheckIn from "./DailyCheckIn";
 import { motion } from "@/utils/animation";
 import { Button } from "@/components/ui/button";
 import { Plus, Calendar, MessageSquare, Loader2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { useGoals } from "@/hooks/useGoals";
 import { useProfile } from "@/hooks/useProfile";
+import AddGoalDialog from "./AddGoalDialog";
 
 const Dashboard = () => {
-  const [goals, setGoals] = useState([]);
+  const [goals, setGoals] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showAddGoal, setShowAddGoal] = useState(false);
   
   const { user } = useAuth();
-  const { getGoals } = useGoals();
+  const { getGoals, updateGoalProgress } = useGoals();
   const { getProfile } = useProfile();
+  const navigate = useNavigate();
   
   const today = new Date();
   const formattedDate = today.toLocaleDateString("en-US", {
@@ -30,9 +33,12 @@ const Dashboard = () => {
   });
 
   useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    
     async function loadData() {
-      if (!user) return;
-      
       setLoading(true);
       try {
         const goalsData = await getGoals();
@@ -48,14 +54,39 @@ const Dashboard = () => {
     }
     
     loadData();
-  }, [user]);
+  }, [user, navigate]);
 
-  const updateGoalProgress = (id: string, progress: number) => {
-    setGoals(
-      goals.map((goal: any) =>
-        goal.id === id ? { ...goal, progress } : goal
-      )
-    );
+  const handleUpdateGoalProgress = async (id: string, progress: number) => {
+    try {
+      await updateGoalProgress(id, progress);
+      
+      // Update goals state
+      setGoals(prev => 
+        prev.map(goal => 
+          goal.id === id 
+            ? { 
+                ...goal, 
+                progress, 
+                // If marking as complete, update streak and days_completed
+                ...(progress === 1 && goal.progress < 1 
+                  ? { 
+                      streak: (goal.streak || 0) + 1, 
+                      days_completed: (goal.days_completed || 0) + 1 
+                    } 
+                  : {}
+                )
+              } 
+            : goal
+        )
+      );
+    } catch (error) {
+      console.error("Error updating goal progress:", error);
+    }
+  };
+
+  const handleAddGoal = (newGoal: any) => {
+    setGoals(prev => [...prev, newGoal]);
+    setShowAddGoal(false);
   };
 
   if (loading) {
@@ -99,7 +130,12 @@ const Dashboard = () => {
       <section>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-medium">Your Goals</h2>
-          <Button size="sm" variant="outline" className="gap-1">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="gap-1"
+            onClick={() => setShowAddGoal(true)}
+          >
             <Plus className="h-4 w-4" /> Add Goal
           </Button>
         </div>
@@ -115,7 +151,7 @@ const Dashboard = () => {
               >
                 <GoalCard 
                   goal={goal} 
-                  onProgressUpdate={updateGoalProgress} 
+                  onProgressUpdate={handleUpdateGoalProgress} 
                 />
               </motion.div>
             ))
@@ -124,7 +160,11 @@ const Dashboard = () => {
               <p className="text-muted-foreground">
                 You haven't set up any goals yet.
               </p>
-              <Button variant="outline" className="mt-4 gap-1">
+              <Button 
+                variant="outline" 
+                className="mt-4 gap-1"
+                onClick={() => setShowAddGoal(true)}
+              >
                 <Plus className="h-4 w-4" /> Add Your First Goal
               </Button>
             </div>
@@ -184,6 +224,13 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Add Goal Dialog */}
+      <AddGoalDialog 
+        open={showAddGoal} 
+        onOpenChange={setShowAddGoal}
+        onAddGoal={handleAddGoal}
+      />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { Mic, Send, Settings, Loader2 } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
+import { useNavigate } from "react-router-dom";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -18,12 +19,16 @@ const ChatInterface = () => {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const { getMessages, sendMessage } = useChatMessages();
+  const { getMessages, sendMessage, generateCoachResponse } = useChatMessages();
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    
     const loadMessages = async () => {
-      if (!user) return;
-      
       setIsLoading(true);
       try {
         const chatMessages = await getMessages();
@@ -51,7 +56,7 @@ const ChatInterface = () => {
     };
     
     loadMessages();
-  }, [user]);
+  }, [user, navigate]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -89,19 +94,17 @@ const ChatInterface = () => {
         );
       }
       
-      // Simulate coach response after a delay
-      setTimeout(async () => {
-        const responseContent = generateCoachResponse(inputText);
-        
-        // Save coach message to database
-        const savedCoachMessage = await sendMessage(responseContent, "coach");
-        
-        if (savedCoachMessage) {
-          setMessages((prev) => [...prev, savedCoachMessage]);
-        }
-        
-        setIsTyping(false);
-      }, 1500);
+      // Get AI response using Gemini API
+      const aiResponse = await generateCoachResponse(inputText, messages);
+      
+      // Save coach message to database
+      const savedCoachMessage = await sendMessage(aiResponse, "coach");
+      
+      if (savedCoachMessage) {
+        setMessages((prev) => [...prev, savedCoachMessage]);
+      }
+      
+      setIsTyping(false);
     } catch (error) {
       console.error("Error handling message:", error);
       setIsTyping(false);
@@ -111,19 +114,6 @@ const ChatInterface = () => {
   const handleVoiceInput = (transcript: string) => {
     setInputText(transcript);
     setIsVoiceMode(false);
-  };
-
-  // Mock response generation - in a real app this would use AI
-  const generateCoachResponse = (userMessage: string): string => {
-    const responses = [
-      "I understand. How would you like to approach that?",
-      "That's interesting. Tell me more about how that's affecting your goals.",
-      "Thank you for sharing. What steps do you think you could take next?",
-      "I hear you. Would it help to break this down into smaller steps?",
-      "That's great progress! How did that make you feel?",
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
   if (isLoading) {

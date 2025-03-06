@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
+import { useFocusAreas } from "@/hooks/useFocusAreas";
 
 export interface Message {
   id: string;
@@ -13,6 +15,8 @@ export interface Message {
 export function useChatMessages() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const { getProfile } = useProfile();
+  const { getFocusAreas } = useFocusAreas();
 
   const getMessages = async () => {
     if (!user) return [];
@@ -72,9 +76,39 @@ export function useChatMessages() {
     }
   };
 
+  const generateCoachResponse = async (userMessage: string, messageHistory: Message[]) => {
+    if (!user) return "I'm sorry, but you need to be logged in to chat with me.";
+    
+    try {
+      // Get user profile and focus areas for context
+      const profile = await getProfile();
+      const focusAreas = await getFocusAreas();
+      
+      const userContext = {
+        profile: {
+          ...profile,
+          focus_areas: focusAreas
+        },
+        messages: messageHistory.slice(-5) // Only send the last 5 messages for context
+      };
+      
+      const { data, error } = await supabase.functions.invoke('gemini-chat', {
+        body: { message: userMessage, userContext }
+      });
+      
+      if (error) throw error;
+      
+      return data.response;
+    } catch (error) {
+      console.error("Error generating coach response:", error);
+      return "I'm having trouble connecting right now. Please try again later.";
+    }
+  };
+
   return {
     getMessages,
     sendMessage,
+    generateCoachResponse,
     isLoading
   };
 }

@@ -11,6 +11,7 @@ interface AuthContextType {
   isLoading: boolean;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -93,6 +94,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   };
 
+  const signInWithGoogle = async () => {
+    setIsLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setIsLoading(false);
+      throw error;
+    }
+
+    // No need to set loading to false here as the redirect will happen
+  };
+
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
     
@@ -108,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut
   };
 

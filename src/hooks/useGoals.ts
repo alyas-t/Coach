@@ -18,7 +18,7 @@ export function useGoals() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const saveGoals = async (goals: Goal[]) => {
+  const saveGoals = async (goals: Omit<Goal, "id">[]) => {
     if (!user) return;
     
     setIsLoading(true);
@@ -27,7 +27,10 @@ export function useGoals() {
         user_id: user.id,
         title: goal.title,
         description: goal.description,
-        type: goal.type
+        type: goal.type,
+        progress: goal.progress || 0,
+        days_completed: goal.days_completed || 0,
+        streak: goal.streak || 0
       }));
 
       const { error } = await supabase
@@ -96,9 +99,30 @@ export function useGoals() {
         .eq('id', id);
 
       if (error) throw error;
+      toast.success("Goal progress updated");
     } catch (error: any) {
       console.error("Error updating goal progress:", error);
       toast.error("Error updating goal");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteGoal = async (id: string) => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('goals')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      toast.success("Goal deleted successfully");
+    } catch (error: any) {
+      console.error("Error deleting goal:", error);
+      toast.error("Error deleting goal");
     } finally {
       setIsLoading(false);
     }
@@ -108,6 +132,7 @@ export function useGoals() {
     saveGoals,
     getGoals,
     updateGoalProgress,
+    deleteGoal,
     isLoading
   };
 }
