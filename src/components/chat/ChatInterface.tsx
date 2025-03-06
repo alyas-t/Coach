@@ -2,9 +2,10 @@
 import { useState, useRef, useEffect } from "react";
 import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
+import VoiceChatModal from "./VoiceChatModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings, Loader2, Volume2, VolumeX } from "lucide-react";
+import { Mic, Send, Settings, Loader2, Volume2, VolumeX, Headphones } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
@@ -17,6 +18,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isVoiceChatOpen, setIsVoiceChatOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -88,13 +90,13 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (inputText.trim() === "") return;
+  const handleSendMessage = async (text: string = inputText) => {
+    if (text.trim() === "") return;
 
     // Create a temporary message with a temporary ID
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
-      content: inputText,
+      content: text,
       sender: "user",
       timestamp: new Date(),
     };
@@ -110,7 +112,7 @@ const ChatInterface = () => {
     
     try {
       // Save user message to database
-      const savedUserMessage = await sendMessage(inputText, "user");
+      const savedUserMessage = await sendMessage(text, "user");
       
       if (savedUserMessage) {
         // Replace the temporary message with the saved one
@@ -120,7 +122,7 @@ const ChatInterface = () => {
       }
       
       // Get AI response using Gemini API with user context
-      const aiResponse = await generateCoachResponse(inputText, messages);
+      const aiResponse = await generateCoachResponse(text, messages);
       
       // Save coach message to database
       const savedCoachMessage = await sendMessage(aiResponse, "coach");
@@ -208,8 +210,18 @@ const ChatInterface = () => {
               size="icon" 
               onClick={() => setIsVoiceMode(true)} 
               className="shrink-0"
+              title="Voice input"
             >
               <Mic className="h-5 w-5 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsVoiceChatOpen(true)}
+              className="shrink-0"
+              title="Voice chat mode"
+            >
+              <Headphones className="h-5 w-5 text-muted-foreground" />
             </Button>
             <Input
               placeholder="Type a message..."
@@ -224,7 +236,7 @@ const ChatInterface = () => {
               className="focus-ring"
             />
             <Button 
-              onClick={handleSendMessage} 
+              onClick={() => handleSendMessage()} 
               disabled={inputText.trim() === ""}
               size="icon"
               className="shrink-0"
@@ -254,6 +266,12 @@ const ChatInterface = () => {
           </div>
         </div>
       )}
+
+      <VoiceChatModal 
+        isOpen={isVoiceChatOpen} 
+        onClose={() => setIsVoiceChatOpen(false)} 
+        onSendMessage={handleSendMessage}
+      />
     </div>
   );
 };

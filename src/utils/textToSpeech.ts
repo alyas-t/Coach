@@ -9,6 +9,8 @@ class TextToSpeech {
   private isSpeaking: boolean = false;
   private preferredVoice: SpeechSynthesisVoice | null = null;
   private enabled: boolean = true;
+  private onSpeakStartCallbacks: Array<() => void> = [];
+  private onSpeakEndCallbacks: Array<() => void> = [];
 
   private constructor() {
     this.speechSynthesis = window.speechSynthesis;
@@ -56,6 +58,7 @@ class TextToSpeech {
     }
 
     this.isSpeaking = true;
+    this.notifySpeakStart();
 
     const utterance = new SpeechSynthesisUtterance(text);
     
@@ -69,12 +72,14 @@ class TextToSpeech {
     
     utterance.onend = () => {
       this.isSpeaking = false;
+      this.notifySpeakEnd();
       if (onEnd) onEnd();
     };
     
     utterance.onerror = (event) => {
       console.error('Speech synthesis error:', event);
       this.isSpeaking = false;
+      this.notifySpeakEnd();
       if (onEnd) onEnd();
     };
 
@@ -85,6 +90,7 @@ class TextToSpeech {
     if (this.speechSynthesis.speaking) {
       this.speechSynthesis.cancel();
       this.isSpeaking = false;
+      this.notifySpeakEnd();
     }
   }
 
@@ -106,6 +112,33 @@ class TextToSpeech {
   public toggleEnabled(): boolean {
     this.setEnabled(!this.enabled);
     return this.enabled;
+  }
+
+  // Add event listeners for speak start/end
+  public onSpeakStart(callback: () => void): void {
+    this.onSpeakStartCallbacks.push(callback);
+  }
+
+  public onSpeakEnd(callback: () => void): void {
+    this.onSpeakEndCallbacks.push(callback);
+  }
+
+  // Remove event listeners
+  public offSpeakStart(callback: () => void): void {
+    this.onSpeakStartCallbacks = this.onSpeakStartCallbacks.filter(cb => cb !== callback);
+  }
+
+  public offSpeakEnd(callback: () => void): void {
+    this.onSpeakEndCallbacks = this.onSpeakEndCallbacks.filter(cb => cb !== callback);
+  }
+
+  // Notify listeners
+  private notifySpeakStart(): void {
+    this.onSpeakStartCallbacks.forEach(callback => callback());
+  }
+
+  private notifySpeakEnd(): void {
+    this.onSpeakEndCallbacks.forEach(callback => callback());
   }
 }
 
