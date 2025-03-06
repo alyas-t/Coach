@@ -1,3 +1,4 @@
+
 /**
  * A utility for handling text-to-speech functionality using ElevenLabs API
  */
@@ -18,6 +19,7 @@ class TextToSpeech {
   private voicePreference: string | null = null;
   private audio: HTMLAudioElement | null = null;
   private useElevenLabs: boolean = true;
+  private isProcessing: boolean = false; // Flag to prevent multiple simultaneous speak requests
 
   private constructor() {
     if (typeof window !== 'undefined') {
@@ -130,10 +132,14 @@ class TextToSpeech {
   }
 
   public async speak(text: string, onEnd?: () => void): Promise<void> {
-    if (!this.enabled || !text) {
+    // If speech is disabled or text is empty, do nothing
+    if (!this.enabled || !text || this.isProcessing) {
       if (onEnd) onEnd();
       return;
     }
+
+    // Set processing flag to prevent multiple speak requests
+    this.isProcessing = true;
 
     // Cancel any ongoing speech
     this.cancel();
@@ -151,6 +157,11 @@ class TextToSpeech {
       console.error('Error during text-to-speech:', error);
       toast.error("Failed to generate speech. Falling back to browser TTS.");
       this.speakWithBrowser(text, onEnd);
+    } finally {
+      // Reset processing flag when speak operation is complete or when it fails
+      setTimeout(() => {
+        this.isProcessing = false;
+      }, 500); // Small delay to prevent rapid successive calls
     }
   }
 
@@ -198,6 +209,9 @@ class TextToSpeech {
       
     } catch (error) {
       console.error("Error using ElevenLabs TTS:", error);
+      this.isSpeaking = false;
+      this.notifySpeakEnd();
+      if (onEnd) onEnd();
       throw error;
     }
   }

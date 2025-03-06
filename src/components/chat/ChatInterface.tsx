@@ -1,12 +1,12 @@
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
 import VoiceChatModal from "./VoiceChatModal";
 import ChatHistory from "./ChatHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Settings, Loader2, Volume2, VolumeX, Headphones, History } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, VolumeX, Headphones, History } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
@@ -26,7 +26,8 @@ const ChatInterface = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [lastChatDate, setLastChatDate] = useState<string | null>(null);
-  
+  const [isMessageSending, setIsMessageSending] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { getMessages, sendMessage, generateCoachResponse, clearTodaysMessages } = useChatMessages();
@@ -34,74 +35,83 @@ const ChatInterface = () => {
   const navigate = useNavigate();
   const tts = useRef(TextToSpeech.getInstance());
 
+  // Function to load messages with error handling
+  const loadChatMessages = useCallback(async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      const profile = await getProfile();
+      setUserProfile(profile);
+      
+      // Get today's date
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if we've already loaded messages today
+      const storedChatDate = localStorage.getItem('last_chat_date');
+      setLastChatDate(storedChatDate);
+      
+      // If the stored date is different from today, reset the chat
+      if (storedChatDate !== today) {
+        console.log("New day detected, resetting chat");
+        // This will clear today's messages if they exist
+        await clearTodaysMessages();
+        localStorage.setItem('last_chat_date', today);
+        setLastChatDate(today);
+      }
+      
+      // Now load today's messages
+      const chatMessages = await getMessages();
+      
+      if (chatMessages.length === 0) {
+        // Add personalized welcome message if no messages exist for today
+        const welcomeMessage = profile?.name 
+          ? `Hello ${profile.name}! How are you feeling today?` 
+          : "Good morning! How are you feeling today?";
+          
+        const initialMessage: Message = {
+          id: "welcome",
+          content: welcomeMessage,
+          sender: "coach" as "coach",
+          timestamp: new Date()
+        };
+        setMessages([initialMessage]);
+        
+        // Save the welcome message to the database
+        await sendMessage(initialMessage.content, initialMessage.sender);
+        
+        // Speak the welcome message
+        tts.current.speak(welcomeMessage);
+      } else {
+        setMessages(chatMessages);
+      }
+    } catch (error) {
+      console.error("Error loading messages:", error);
+      toast.error("Failed to load your chat history", {
+        description: "Please try refreshing the page",
+        action: {
+          label: "Retry",
+          onClick: () => loadChatMessages()
+        }
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, navigate, getMessages, sendMessage, clearTodaysMessages, getProfile]);
+
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
     
-    const loadMessages = async () => {
-      setIsLoading(true);
-      try {
-        const profile = await getProfile();
-        setUserProfile(profile);
-        
-        // Get today's date
-        const today = new Date().toISOString().split('T')[0];
-        
-        // Check if we've already loaded messages today
-        const storedChatDate = localStorage.getItem('last_chat_date');
-        setLastChatDate(storedChatDate);
-        
-        // If the stored date is different from today, reset the chat
-        if (storedChatDate !== today) {
-          console.log("New day detected, resetting chat");
-          // This will clear today's messages if they exist
-          await clearTodaysMessages();
-          localStorage.setItem('last_chat_date', today);
-          setLastChatDate(today);
-        }
-        
-        // Now load today's messages
-        const chatMessages = await getMessages();
-        
-        if (chatMessages.length === 0) {
-          // Add personalized welcome message if no messages exist for today
-          const welcomeMessage = profile?.name 
-            ? `Hello ${profile.name}! How are you feeling today?` 
-            : "Good morning! How are you feeling today?";
-            
-          const initialMessage: Message = {
-            id: "welcome",
-            content: welcomeMessage,
-            sender: "coach" as "coach",
-            timestamp: new Date()
-          };
-          setMessages([initialMessage]);
-          
-          // Save the welcome message to the database
-          await sendMessage(initialMessage.content, initialMessage.sender);
-          
-          // Speak the welcome message
-          tts.current.speak(welcomeMessage);
-        } else {
-          setMessages(chatMessages);
-        }
-      } catch (error) {
-        console.error("Error loading messages:", error);
-        toast.error("Failed to load your chat history");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadMessages();
+    loadChatMessages();
     
     return () => {
       // Cancel any ongoing speech when component unmounts
       tts.current.cancel();
     };
-  }, [user, navigate]);
+  }, [user, navigate, loadChatMessages]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -112,8 +122,11 @@ const ChatInterface = () => {
   }, [messages]);
 
   const handleSendMessage = async (text: string = inputText) => {
-    if (text.trim() === "") return;
+    if (text.trim() === "" || isMessageSending) return;
 
+    // Set sending state to prevent multiple sends
+    setIsMessageSending(true);
+    
     // Create a temporary message with a temporary ID
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
@@ -142,7 +155,7 @@ const ChatInterface = () => {
         );
       }
       
-      // Get AI response using Gemini API with user context
+      // Get AI response using Perplexity API with user context
       const aiResponse = await generateCoachResponse(text, messages);
       
       // Save coach message to database
@@ -153,7 +166,10 @@ const ChatInterface = () => {
         
         // Speak the AI response if speech is enabled
         if (speechEnabled) {
-          tts.current.speak(aiResponse);
+          setTimeout(() => {
+            // Add a small delay before speaking to prevent multiple voice responses
+            tts.current.speak(aiResponse);
+          }, 300);
         }
       }
       
@@ -162,6 +178,8 @@ const ChatInterface = () => {
       console.error("Error handling message:", error);
       toast.error("Something went wrong sending your message");
       setIsTyping(false);
+    } finally {
+      setIsMessageSending(false);
     }
   };
 
@@ -232,6 +250,7 @@ const ChatInterface = () => {
               onClick={() => setIsVoiceMode(true)} 
               className="shrink-0"
               title="Voice input"
+              disabled={isMessageSending}
             >
               <Mic className="h-5 w-5 text-muted-foreground" />
             </Button>
@@ -241,6 +260,7 @@ const ChatInterface = () => {
               onClick={() => setIsVoiceChatOpen(true)}
               className="shrink-0"
               title="Voice chat mode"
+              disabled={isMessageSending}
             >
               <Headphones className="h-5 w-5 text-muted-foreground" />
             </Button>
@@ -249,20 +269,25 @@ const ChatInterface = () => {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !isMessageSending) {
                   e.preventDefault();
                   handleSendMessage();
                 }
               }}
               className="focus-ring"
+              disabled={isMessageSending}
             />
             <Button 
               onClick={() => handleSendMessage()} 
-              disabled={inputText.trim() === ""}
+              disabled={inputText.trim() === "" || isMessageSending}
               size="icon"
               className="shrink-0"
             >
-              <Send className="h-5 w-5" />
+              {isMessageSending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
             </Button>
             <Button 
               variant="outline"
@@ -270,6 +295,7 @@ const ChatInterface = () => {
               className="shrink-0"
               onClick={toggleSpeech}
               title={speechEnabled ? "Disable voice" : "Enable voice"}
+              disabled={isMessageSending}
             >
               {speechEnabled ? (
                 <Volume2 className="h-5 w-5 text-muted-foreground" />
@@ -283,6 +309,7 @@ const ChatInterface = () => {
               className="shrink-0"
               onClick={() => setIsHistoryOpen(true)}
               title="Chat history"
+              disabled={isMessageSending}
             >
               <History className="h-5 w-5 text-muted-foreground" />
             </Button>

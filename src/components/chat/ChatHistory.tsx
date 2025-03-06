@@ -18,60 +18,66 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Calendar, MessageSquare, RefreshCw } from "lucide-react";
+import { Loader2, Calendar, MessageSquare, RefreshCw, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
-const ChatHistory = ({ onClose }) => {
+const ChatHistory = ({ onClose }: { onClose: () => void }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chatDays, setChatDays] = useState<string[]>([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { user } = useAuth();
+
+  // Fetch chat days with retry logic
+  const fetchChatDays = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Loading chat history days");
+      
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Group by date (ignoring time)
+      const days = new Set<string>();
+      if (data && data.length > 0) {
+        data.forEach(message => {
+          const date = new Date(message.created_at).toISOString().split('T')[0];
+          days.add(date);
+        });
+        setChatDays(Array.from(days));
+      } else {
+        setChatDays([]);
+      }
+    } catch (error: any) {
+      console.error("Error fetching chat days:", error);
+      setError(error.message || "Failed to load chat history");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
-
-    const fetchChatDays = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const { data, error } = await supabase
-          .from('chat_messages')
-          .select('created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        // Group by date (ignoring time)
-        const days = new Set<string>();
-        if (data && data.length > 0) {
-          data.forEach(message => {
-            const date = new Date(message.created_at).toISOString().split('T')[0];
-            days.add(date);
-          });
-          setChatDays(Array.from(days));
-        } else {
-          setChatDays([]);
-        }
-      } catch (error: any) {
-        console.error("Error fetching chat days:", error);
-        setError(error.message || "Failed to load chat history");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchChatDays();
-  }, [user]);
+  }, [user, retryCount]);
 
+  // Handle day selection with improved error handling
   const handleDaySelect = async (day: string) => {
     setSelectedDay(day);
-    setLoading(true);
-    setError(null);
+    setLoadingMessages(true);
+    setMessageError(null);
 
     try {
       // Convert the selected day to timestamp ranges
@@ -79,22 +85,46 @@ const ChatHistory = ({ onClose }) => {
       const endOfDay = new Date(day);
       endOfDay.setDate(endOfDay.getDate() + 1);
 
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('created_at', startOfDay.toISOString())
-        .lt('created_at', endOfDay.toISOString())
-        .order('created_at', { ascending: true });
+      // Add retry logic for message fetching
+      let attempts = 0;
+      const maxAttempts = 3;
+      let success = false;
+      let result = null;
+      
+      while (attempts < maxAttempts && !success) {
+        try {
+          const response = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('user_id', user.id)
+            .gte('created_at', startOfDay.toISOString())
+            .lt('created_at', endOfDay.toISOString())
+            .order('created_at', { ascending: true });
+            
+          if (response.error) throw response.error;
+          
+          result = response.data;
+          success = true;
+        } catch (err) {
+          attempts++;
+          console.error(`Attempt ${attempts} failed to fetch messages:`, err);
+          
+          if (attempts < maxAttempts) {
+            // Wait before retry with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
+          } else {
+            throw err;
+          }
+        }
+      }
 
-      if (error) throw error;
-      setMessages(data || []);
+      setMessages(result || []);
     } catch (error: any) {
       console.error("Error fetching messages for day:", error);
-      setError(error.message || "Failed to load messages for this day");
+      setMessageError(error.message || "Failed to load messages for this day");
       setMessages([]);
     } finally {
-      setLoading(false);
+      setLoadingMessages(false);
     }
   };
 
@@ -102,42 +132,7 @@ const ChatHistory = ({ onClose }) => {
     if (selectedDay) {
       handleDaySelect(selectedDay);
     } else {
-      // Fetch chat days again
-      setChatDays([]);
-      setError(null);
-      setLoading(true);
-      
-      const fetchChatDays = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('chat_messages')
-            .select('created_at')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-          if (error) throw error;
-
-          // Group by date (ignoring time)
-          const days = new Set<string>();
-          if (data && data.length > 0) {
-            data.forEach(message => {
-              const date = new Date(message.created_at).toISOString().split('T')[0];
-              days.add(date);
-            });
-            setChatDays(Array.from(days));
-          } else {
-            setChatDays([]);
-          }
-        } catch (error: any) {
-          console.error("Error retrying chat days fetch:", error);
-          setError(error.message || "Failed to load chat history");
-          toast.error("Failed to load chat history");
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      fetchChatDays();
+      setRetryCount(prev => prev + 1);
     }
   };
 
@@ -168,12 +163,13 @@ const ChatHistory = ({ onClose }) => {
               )}
             </CardHeader>
             <CardContent className="p-0">
-              {loading && !selectedDay ? (
+              {loading ? (
                 <div className="flex justify-center items-center h-40">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              ) : error && !selectedDay ? (
+              ) : error ? (
                 <div className="p-4 text-center">
+                  <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-2" />
                   <p className="text-sm text-destructive mb-2">{error}</p>
                   <Button variant="outline" size="sm" onClick={handleRetry}>
                     <RefreshCw className="h-4 w-4 mr-2" />
@@ -196,7 +192,7 @@ const ChatHistory = ({ onClose }) => {
                         </Button>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground p-2">
+                      <p className="text-sm text-muted-foreground p-2 text-center">
                         No chat history found
                       </p>
                     )}
@@ -219,13 +215,14 @@ const ChatHistory = ({ onClose }) => {
               <ScrollArea className="h-[60vh]">
                 <div className="px-4 py-2">
                   {selectedDay ? (
-                    loading ? (
+                    loadingMessages ? (
                       <div className="flex justify-center items-center h-40">
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
                       </div>
-                    ) : error ? (
+                    ) : messageError ? (
                       <div className="flex flex-col items-center justify-center py-8">
-                        <p className="text-sm text-destructive mb-4">{error}</p>
+                        <AlertCircle className="h-10 w-10 text-destructive mb-2" />
+                        <p className="text-sm text-destructive mb-4">{messageError}</p>
                         <Button variant="outline" size="sm" onClick={handleRetry}>
                           <RefreshCw className="h-4 w-4 mr-2" />
                           Retry

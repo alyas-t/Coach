@@ -1,12 +1,12 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ChatInterface from "@/components/chat/ChatInterface";
 import PageTransition from "@/components/layout/PageTransition";
 import Header from "@/components/layout/Header";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { History, Volume2 } from "lucide-react";
+import { History, Volume2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatMessages } from "@/hooks/useChatMessages";
 import { toast } from "sonner";
@@ -33,7 +33,63 @@ const Chat = () => {
     // Load ElevenLabs voices
     const voices = tts.getElevenLabsVoices();
     setAvailableVoices(voices);
+    
+    // Check if there's a preferred voice in localStorage
+    const savedVoice = localStorage.getItem('preferred_voice');
+    if (savedVoice) {
+      setSelectedVoice(savedVoice);
+      tts.setVoicePreference(savedVoice);
+    }
   }, []);
+
+  // Function to load chat history with retry mechanism
+  const loadChatHistory = useCallback(async () => {
+    if (!user) return;
+    
+    setIsLoadingHistory(true);
+    setHistoryError(false);
+    
+    try {
+      console.log("Loading chat history days");
+      
+      let attempts = 0;
+      const maxAttempts = 3;
+      let success = false;
+      let days: string[] = [];
+      
+      while (attempts < maxAttempts && !success) {
+        try {
+          days = await getChatDays();
+          success = true;
+        } catch (err) {
+          attempts++;
+          console.error(`Attempt ${attempts} failed to load chat history:`, err);
+          
+          if (attempts >= maxAttempts) {
+            throw err;
+          }
+          
+          // Wait with exponential backoff before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
+        }
+      }
+      
+      console.log("Received chat days:", days);
+      setHistoricalDates(days);
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+      setHistoryError(true);
+      toast.error("Failed to load chat history", {
+        description: "We couldn't retrieve your previous conversations",
+        action: {
+          label: "Retry",
+          onClick: () => loadChatHistory()
+        }
+      });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }, [user, getChatDays]);
 
   useEffect(() => {
     if (!user) {
@@ -59,26 +115,8 @@ const Chat = () => {
     }
     
     // Load chat history dates
-    const loadChatDays = async () => {
-      setIsLoadingHistory(true);
-      setHistoryError(false);
-      
-      try {
-        console.log("Loading chat history days");
-        const days = await getChatDays();
-        console.log("Received chat days:", days);
-        setHistoricalDates(days);
-      } catch (error) {
-        console.error("Error loading chat history:", error);
-        setHistoryError(true);
-        toast.error("Failed to load chat history");
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
-    
-    loadChatDays();
-  }, [user, navigate, getChatDays, searchParams]);
+    loadChatHistory();
+  }, [user, navigate, loadChatHistory, searchParams]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -98,27 +136,15 @@ const Chat = () => {
 
   const retryLoadHistory = async () => {
     if (isLoadingHistory) return;
-    
-    setIsLoadingHistory(true);
-    setHistoryError(false);
-    
-    try {
-      const days = await getChatDays();
-      setHistoricalDates(days);
-      toast.success("Chat history loaded successfully");
-    } catch (error) {
-      console.error("Error reloading chat history:", error);
-      setHistoryError(true);
-      toast.error("Failed to load chat history");
-    } finally {
-      setIsLoadingHistory(false);
-    }
+    await loadChatHistory();
   };
   
   const handleVoiceChange = (voiceId: string) => {
     setSelectedVoice(voiceId);
     const tts = TextToSpeech.getInstance();
     tts.setVoicePreference(voiceId);
+    // Save preference to localStorage
+    localStorage.setItem('preferred_voice', voiceId);
     toast.success("Voice updated successfully");
   };
 
@@ -197,6 +223,7 @@ const Chat = () => {
                     </div>
                   ) : historyError ? (
                     <div className="text-center py-6">
+                      <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-2" />
                       <p className="text-muted-foreground mb-4">Failed to load chat history</p>
                       <Button onClick={retryLoadHistory}>
                         Retry

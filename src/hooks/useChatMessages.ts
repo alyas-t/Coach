@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -200,7 +200,7 @@ export function useChatMessages() {
       const { data, error } = await supabase.functions.invoke('perplexity-chat', {
         body: {
           message: userMessage,
-          history: previousMessages.map(msg => ({
+          history: previousMessages.slice(-10).map(msg => ({  // Only use last 10 messages for context
             sender: msg.sender,
             content: msg.content
           }))
@@ -260,42 +260,57 @@ export function useChatMessages() {
     }
   };
 
-  // Function to get distinct chat days for history
-  const getChatDays = async (): Promise<string[]> => {
+  // Function to get distinct chat days for history with retries
+  const getChatDays = useCallback(async (): Promise<string[]> => {
     if (!user) return [];
     
-    try {
-      console.log("Getting chat days for user:", user.id);
-      
-      // Using a direct query to get distinct dates
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .select('created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error getting chat days:', error);
-        throw error;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`Getting chat days for user (attempt ${retryCount + 1}):`, user.id);
+        
+        // Using a direct query to get distinct dates
+        const { data, error } = await supabase
+          .from('chat_messages')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error getting chat days:', error);
+          throw error;
+        }
+        
+        // Extract unique dates (YYYY-MM-DD format)
+        const uniqueDates = new Set<string>();
+        
+        if (data && data.length > 0) {
+          data.forEach(msg => {
+            const dateOnly = new Date(msg.created_at).toISOString().split('T')[0];
+            uniqueDates.add(dateOnly);
+          });
+        }
+        
+        console.log("Retrieved unique chat days:", Array.from(uniqueDates));
+        return Array.from(uniqueDates);
+      } catch (error: any) {
+        console.error(`Error getting chat days (attempt ${retryCount + 1}):`, error);
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          throw error; // Let the component handle this error after max retries
+        }
+        
+        // Exponential backoff
+        const backoffTime = 1000 * Math.pow(2, retryCount - 1);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
       }
-      
-      // Extract unique dates (YYYY-MM-DD format)
-      const uniqueDates = new Set<string>();
-      
-      if (data && data.length > 0) {
-        data.forEach(msg => {
-          const dateOnly = new Date(msg.created_at).toISOString().split('T')[0];
-          uniqueDates.add(dateOnly);
-        });
-      }
-      
-      console.log("Retrieved unique chat days:", Array.from(uniqueDates));
-      return Array.from(uniqueDates);
-    } catch (error) {
-      console.error('Error getting chat days:', error);
-      throw error; // Let the component handle this error
     }
-  };
+    
+    return []; // Fallback empty array if all retries fail
+  }, [user]);
   
   // Load initial messages on component mount
   useEffect(() => {
