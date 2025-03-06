@@ -17,6 +17,7 @@ class TextToSpeech {
   private voicePreference: string | null = null;
   private useEdgeFunction: boolean = true;
   private audio: HTMLAudioElement | null = null;
+  private openAIVoice: string = "alloy"; // Default OpenAI voice
 
   private constructor() {
     if (typeof window !== 'undefined') {
@@ -77,8 +78,16 @@ class TextToSpeech {
     this.selectPreferredVoice();
   }
 
+  public setOpenAIVoice(voice: string): void {
+    this.openAIVoice = voice;
+  }
+
   public getAvailableVoices(): SpeechSynthesisVoice[] {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
+  }
+
+  public getOpenAIVoices(): string[] {
+    return ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
   }
 
   public async speak(text: string, onEnd?: () => void): Promise<void> {
@@ -119,7 +128,7 @@ class TextToSpeech {
       const { data, error } = await supabase.functions.invoke("text-to-speech", {
         body: { 
           text: text,
-          voice: "alloy" // Default OpenAI voice
+          voice: this.openAIVoice
         }
       });
 
@@ -154,10 +163,6 @@ class TextToSpeech {
     } catch (error: any) {
       console.error("Text-to-speech error:", error);
       toast.error("Failed to generate speech: " + (error.message || "Unknown error"));
-      
-      this.isSpeaking = false;
-      this.notifySpeakEnd();
-      if (onEnd) onEnd();
       
       // Fall back to browser TTS
       this.useEdgeFunction = false;

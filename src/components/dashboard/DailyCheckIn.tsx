@@ -19,6 +19,20 @@ const DailyCheckIn = () => {
   const [activeTab, setActiveTab] = useState("morning");
   const { user } = useAuth();
   const tts = TextToSpeech.getInstance();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  useEffect(() => {
+    const handleSpeakStart = () => setIsSpeaking(true);
+    const handleSpeakEnd = () => setIsSpeaking(false);
+    
+    tts.onSpeakStart(handleSpeakStart);
+    tts.onSpeakEnd(handleSpeakEnd);
+    
+    return () => {
+      tts.offSpeakStart(handleSpeakStart);
+      tts.offSpeakEnd(handleSpeakEnd);
+    };
+  }, []);
   
   useEffect(() => {
     const fetchTodayCheckIns = async () => {
@@ -216,10 +230,15 @@ const DailyCheckIn = () => {
 
   const handleSpeakQuestion = async (question: string) => {
     try {
+      if (isSpeaking) {
+        tts.cancel();
+        return;
+      }
+      
       await tts.speak(question);
     } catch (error) {
       console.error("Error speaking question:", error);
-      toast.error("Failed to speak question. Using browser TTS instead.");
+      toast.error("Failed to speak question");
     }
   };
 
@@ -255,12 +274,12 @@ const DailyCheckIn = () => {
           <h4 className="text-lg font-medium">{checkIn.question}</h4>
           <div className="flex gap-2">
             <Button 
-              variant="ghost" 
+              variant={isSpeaking ? "secondary" : "ghost"} 
               size="sm" 
-              className="text-muted-foreground"
+              className={isSpeaking ? "text-primary" : "text-muted-foreground"}
               onClick={() => handleSpeakQuestion(checkIn.question)}
             >
-              <span className="sr-only">Listen</span>
+              <span className="sr-only">{isSpeaking ? "Stop" : "Listen"}</span>
               <Volume2 className="h-4 w-4" />
             </Button>
           </div>
