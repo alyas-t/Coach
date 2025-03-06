@@ -32,17 +32,22 @@ export function useChatMessages() {
       // If no date is provided, use today's date
       const queryDate = date || new Date().toISOString().split('T')[0];
       
-      const { data, error } = await supabase
+      // Use a type assertion with 'any' to prevent deep type analysis
+      const result = await supabase
         .from('chat_messages')
         .select('*')
         .eq('user_id', user.id)
         .eq('chat_date', queryDate)
         .order('created_at', { ascending: true });
       
+      const { data, error } = result as any;
+      
       if (error) throw error;
       
-      // Type assertion to avoid deep type instantiation
-      return (data as unknown as ChatMessageRow[]).map(message => ({
+      // Convert the any type to our known structure
+      const typedData = data as ChatMessageRow[];
+      
+      return typedData.map(message => ({
         id: message.id,
         content: message.content,
         sender: message.sender as "user" | "coach",
