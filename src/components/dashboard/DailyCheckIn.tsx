@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -369,13 +368,11 @@ const DailyCheckIn = () => {
     return null;
   }
 
-  // Group check-ins by type
   const checkInsByType: Record<string, any> = {};
   checkIns.forEach(checkIn => {
     checkInsByType[checkIn.check_in_type] = checkIn;
   });
 
-  // If all check-ins are completed, show a summary
   const allCompleted = checkIns.every(c => c.completed);
   if (allCompleted) {
     return (

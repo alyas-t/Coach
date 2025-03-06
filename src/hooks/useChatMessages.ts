@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -194,8 +193,6 @@ export function useChatMessages() {
   // Function to generate a coach response using Perplexity API
   const generateCoachResponse = async (userMessage: string, previousMessages: Message[]): Promise<string> => {
     try {
-      console.log("Generating coach response with Perplexity API");
-      
       // Call the Edge Function to get AI response from Perplexity
       const { data, error } = await supabase.functions.invoke('perplexity-chat', {
         body: {
@@ -217,7 +214,6 @@ export function useChatMessages() {
         console.error("Error from Perplexity API:", data.error);
         // If we have a fallback response, use it
         if (data?.response) {
-          console.log("Using fallback response");
           return data.response;
         }
         throw new Error(data.error);
@@ -269,8 +265,6 @@ export function useChatMessages() {
     
     while (retryCount <= maxRetries) {
       try {
-        console.log(`Getting chat days for user (attempt ${retryCount + 1}):`, user.id);
-        
         // Using a direct query to get distinct dates
         const { data, error } = await supabase
           .from('chat_messages')
@@ -293,7 +287,6 @@ export function useChatMessages() {
           });
         }
         
-        console.log("Retrieved unique chat days:", Array.from(uniqueDates));
         return Array.from(uniqueDates);
       } catch (error: any) {
         console.error(`Error getting chat days (attempt ${retryCount + 1}):`, error);

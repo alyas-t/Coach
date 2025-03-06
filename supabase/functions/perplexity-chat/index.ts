@@ -136,8 +136,6 @@ async function makeRequestWithRetry(messages: any[]): Promise<Response> {
   
   while (retries <= CONFIG.RETRY.MAX_ATTEMPTS) {
     try {
-      console.log(`Attempt ${retries + 1} to call Perplexity API`);
-      
       response = await fetch(CONFIG.API_URL, {
         method: "POST",
         headers: {
@@ -161,7 +159,6 @@ async function makeRequestWithRetry(messages: any[]): Promise<Response> {
       // If we got rate limited, wait and retry
       if (response.status === 429) {
         const waitTime = (retries + 1) * CONFIG.RETRY.INITIAL_DELAY_MS;
-        console.log(`Rate limited, retrying in ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         retries++;
         continue;
@@ -172,12 +169,10 @@ async function makeRequestWithRetry(messages: any[]): Promise<Response> {
       throw new Error(`Perplexity API error: ${response.status} - ${errorText}`);
     } catch (error: any) {
       lastError = error;
-      console.error(`Attempt ${retries + 1} failed:`, error);
       
       if (retries >= CONFIG.RETRY.MAX_ATTEMPTS) break;
       
       const backoffTime = CONFIG.RETRY.INITIAL_DELAY_MS * Math.pow(2, retries);
-      console.log(`Retrying in ${backoffTime}ms...`);
       await new Promise(resolve => setTimeout(resolve, backoffTime));
       retries++;
     }
@@ -196,7 +191,6 @@ async function processResponse(response: Response): Promise<string> {
   const data = await response.json();
   
   if (!data.choices || !data.choices[0]?.message?.content) {
-    console.error("Invalid response format from API:", JSON.stringify(data));
     throw new Error("Invalid response format from Perplexity API");
   }
   
@@ -243,8 +237,6 @@ function createErrorResponse(error: Error): Response {
  */
 async function handleChatRequest(req: Request): Promise<Response> {
   try {
-    console.log("Perplexity chat function received a request");
-    
     // Parse request
     const requestData = await req.json();
     
@@ -255,23 +247,19 @@ async function handleChatRequest(req: Request): Promise<Response> {
     
     // Create system prompt
     const systemPrompt = createSystemPrompt(userContext);
-    console.log("Using system prompt:", systemPrompt.substring(0, 100) + "...");
     
     // Prepare messages
     const messages = prepareMessages(systemPrompt, history, message);
     
     // Make the request to Perplexity API
-    console.log("Sending request to Perplexity API");
     const response = await makeRequestWithRetry(messages);
     
     // Process the response
     const generatedText = await processResponse(response);
-    console.log("Perplexity API response received successfully");
     
     // Return the response
     return createSuccessResponse(generatedText);
   } catch (error: any) {
-    console.error("Error processing chat request:", error);
     return createErrorResponse(error);
   }
 }

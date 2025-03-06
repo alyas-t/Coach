@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ChatInterface from "@/components/chat/ChatInterface";
@@ -50,8 +49,6 @@ const Chat = () => {
     setHistoryError(false);
     
     try {
-      console.log("Loading chat history days");
-      
       let attempts = 0;
       const maxAttempts = 3;
       let success = false;
@@ -74,7 +71,6 @@ const Chat = () => {
         }
       }
       
-      console.log("Received chat days:", days);
       setHistoricalDates(days);
     } catch (error) {
       console.error("Error loading chat history:", error);
