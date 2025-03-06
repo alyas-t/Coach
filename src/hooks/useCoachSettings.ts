@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface CoachSettings {
   coachStyle: string;
@@ -28,7 +29,7 @@ export function useCoachSettings() {
       // Add optional fields if they exist
       if (settings.morningTime) updateData.morning_time = settings.morningTime;
       if (settings.eveningTime) updateData.evening_time = settings.eveningTime;
-      if (settings.intensity) updateData.coach_intensity = settings.intensity;
+      if (settings.intensity !== undefined) updateData.coach_intensity = settings.intensity;
       
       const { error } = await supabase
         .from('profiles')
@@ -36,8 +37,10 @@ export function useCoachSettings() {
         .eq('id', user.id);
 
       if (error) throw error;
+      toast.success("Coach settings saved successfully");
     } catch (error: any) {
       console.error("Error saving coach settings:", error);
+      toast.error(error.message || "Failed to save coach settings");
     } finally {
       setIsLoading(false);
     }

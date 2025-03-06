@@ -164,28 +164,37 @@ export type Database = {
       profiles: {
         Row: {
           age: number | null
+          coach_intensity: number | null
           coach_style: string | null
           coach_tone: string | null
           created_at: string | null
+          evening_time: string | null
           id: string
+          morning_time: string | null
           name: string | null
           updated_at: string | null
         }
         Insert: {
           age?: number | null
+          coach_intensity?: number | null
           coach_style?: string | null
           coach_tone?: string | null
           created_at?: string | null
+          evening_time?: string | null
           id: string
+          morning_time?: string | null
           name?: string | null
           updated_at?: string | null
         }
         Update: {
           age?: number | null
+          coach_intensity?: number | null
           coach_style?: string | null
           coach_tone?: string | null
           created_at?: string | null
+          evening_time?: string | null
           id?: string
+          morning_time?: string | null
           name?: string | null
           updated_at?: string | null
         }
