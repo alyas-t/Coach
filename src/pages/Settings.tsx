@@ -60,6 +60,7 @@ const Settings = () => {
   const [morningTime, setMorningTime] = useState("08:00");
   const [eveningTime, setEveningTime] = useState("20:00");
   const [notificationSaving, setNotificationSaving] = useState(false);
+  const [intensity, setIntensity] = useState(3);
   
   useEffect(() => {
     if (!user) {
@@ -72,8 +73,9 @@ const Settings = () => {
         const settings = await getCoachSettings();
         if (settings) {
           console.log("Loaded settings:", settings);
-          setCoachStyle(settings.coach_style || "supportive");
-          setCoachTone(settings.coach_tone || "friendly");
+          if (settings.coach_style) setCoachStyle(settings.coach_style);
+          if (settings.coach_tone) setCoachTone(settings.coach_tone);
+          if (settings.coach_intensity) setIntensity(settings.coach_intensity);
           
           if (settings.morning_time) setMorningTime(settings.morning_time);
           if (settings.evening_time) setEveningTime(settings.evening_time);
@@ -88,45 +90,47 @@ const Settings = () => {
   }, [user, navigate, getCoachSettings]);
   
   const handleSaveCoachSettings = async () => {
-    if (isSaving) return;
+    if (isSaving || isCoachSettingsLoading) return;
     
     setIsSaving(true);
-    console.log("Saving coach settings:", { coachStyle, coachTone });
+    console.log("Saving coach settings:", { coachStyle, coachTone, intensity });
     
     try {
-      await saveCoachSettings({
+      const result = await saveCoachSettings({
         coachStyle,
-        coachTone
+        coachTone,
+        intensity
       });
       
-      // No need for toast here as it's handled in the hook
+      if (!result) {
+        console.error("Failed to save coach settings - no result returned");
+      }
     } catch (error) {
       console.error("Error in handleSaveCoachSettings:", error);
-      // No need for toast here as it's handled in the hook
     } finally {
       setIsSaving(false);
     }
   };
 
   const saveNotificationSettings = async () => {
-    if (notificationSaving) return;
+    if (notificationSaving || isCoachSettingsLoading) return;
     
     setNotificationSaving(true);
     try {
-      await saveCoachSettings({
+      const result = await saveCoachSettings({
         coachStyle,
         coachTone,
         morningTime,
-        eveningTime
+        eveningTime,
+        intensity
       });
       
-      scheduleDailyNotification("morning", morningTime, "Time for your Morning Planning!");
-      scheduleDailyNotification("evening", eveningTime, "Time for your Evening Reflection!");
-      
-      // No need for toast here as it's handled in the hook
+      if (result) {
+        scheduleDailyNotification("morning", morningTime, "Time for your Morning Planning!");
+        scheduleDailyNotification("evening", eveningTime, "Time for your Evening Reflection!");
+      }
     } catch (error) {
       console.error("Error saving notification settings:", error);
-      // No need for toast here as it's handled in the hook
     } finally {
       setNotificationSaving(false);
     }

@@ -44,7 +44,7 @@ const UpcomingCheckIns = () => {
         .from('profiles')
         .select('morning_time, evening_time')
         .eq('id', user.id)
-        .maybeSingle();
+        .single();
         
       if (error) {
         console.error("Error fetching user settings:", error);
@@ -69,10 +69,11 @@ const UpcomingCheckIns = () => {
     const currentMinutes = new Date().getMinutes();
     const upcomingCheckIns = [];
     
+    // Find morning and evening check-ins
     const morningCheckIn = checkIns.find(c => c.check_in_type === 'morning');
     const eveningCheckIn = checkIns.find(c => c.check_in_type === 'evening');
     
-    // Only show check-ins that are not completed
+    // Check completion status
     const isMorningCompleted = morningCheckIn && morningCheckIn.completed;
     const isEveningCompleted = eveningCheckIn && eveningCheckIn.completed;
     
@@ -90,23 +91,23 @@ const UpcomingCheckIns = () => {
       currentHour > eveningHour || 
       (currentHour === eveningHour && currentMinutes >= eveningMinute);
     
-    // Morning Check-in - only add if not completed
+    // Only show morning check-in if not completed
     if (!isMorningCompleted && (!isPastEveningTime)) {
       upcomingCheckIns.push({
         id: 'morning',
         title: 'Morning Planning',
         time: `Today at ${userSettings.morningTime}`,
-        active: !isPastMorningTime || !isMorningCompleted
+        active: isPastMorningTime
       });
     }
     
-    // Evening Check-in - only add if not completed
+    // Only show evening check-in if not completed
     if (!isEveningCompleted) {
       upcomingCheckIns.push({
         id: 'evening',
         title: 'Evening Reflection',
         time: `Today at ${userSettings.eveningTime}`,
-        active: isPastMorningTime && (!isPastEveningTime || !isEveningCompleted)
+        active: isPastMorningTime && isPastEveningTime
       });
     }
     

@@ -20,7 +20,7 @@ serve(async (req) => {
 
   try {
     const { message, userContext } = await req.json();
-    console.log("Received request:", { message, userContext });
+    console.log("Received request:", { message, userContext: JSON.stringify(userContext) });
     
     // Prepare history from context if available
     const history = userContext?.messages || [];
@@ -51,6 +51,9 @@ serve(async (req) => {
         case 'challenging':
           systemPrompt += " Your coaching style is challenging. Push the user to step outside their comfort zone, set ambitious goals, and overcome obstacles. Challenge their limiting beliefs and assumptions. Use phrases like 'I know you can do better' and 'Let's push your limits'.";
           break;
+        case 'analytical':
+          systemPrompt += " Your coaching style is analytical. Focus on data, logical analysis, and evidence-based approaches. Help the user understand patterns and make informed decisions. Use phrases like 'The data suggests' and 'Let's analyze this logically'.";
+          break;
         default:
           systemPrompt += ` Your style is ${userProfile.coach_style}.`;
       }
@@ -68,8 +71,27 @@ serve(async (req) => {
         case 'motivational':
           systemPrompt += " Your tone is motivational. Be energetic, inspiring, and use language that drives action. Use powerful, emotionally resonant language to inspire change. Use metaphors and stories to inspire. Be enthusiastic and passionate.";
           break;
+        case 'direct':
+          systemPrompt += " Your tone is direct and concise. Be straightforward and get to the point quickly. Use simple, clear language without unnecessary elaboration. Focus on brevity and clarity in your responses.";
+          break;
         default:
           systemPrompt += ` Your tone is ${userProfile.coach_tone}.`;
+      }
+    }
+    
+    // Add coaching intensity if available
+    if (userProfile.coach_intensity) {
+      const intensity = parseInt(userProfile.coach_intensity);
+      if (intensity === 1) {
+        systemPrompt += " Your coaching intensity is very gentle. Focus on being supportive and kind, with minimal pushing or challenges.";
+      } else if (intensity === 2) {
+        systemPrompt += " Your coaching intensity is mild. Provide gentle guidance and occasional gentle nudges, but primarily be supportive.";
+      } else if (intensity === 3) {
+        systemPrompt += " Your coaching intensity is moderate. Balance support with accountability and occasionally challenge the user when appropriate.";
+      } else if (intensity === 4) {
+        systemPrompt += " Your coaching intensity is firm. Maintain high expectations and regularly challenge the user to push beyond their comfort zone.";
+      } else if (intensity === 5) {
+        systemPrompt += " Your coaching intensity is high. Be very direct and challenging, consistently pushing the user to excel and reach their maximum potential.";
       }
     }
     
@@ -114,6 +136,8 @@ serve(async (req) => {
     // Add guidance about response length and structure
     systemPrompt += " Keep your responses concise and well-structured - typically 2-4 paragraphs. Break down complex ideas into digestible points. Your advice should be actionable and practical, something they can implement right away.";
     
+    console.log("Using system prompt:", systemPrompt);
+    
     // Prepare messages for the API
     const contents = [
       { role: "user", parts: [{ text: systemPrompt }] },
@@ -124,7 +148,7 @@ serve(async (req) => {
       { role: "user", parts: [{ text: message }] }
     ];
 
-    console.log("Sending request to Gemini API with system prompt:", systemPrompt);
+    console.log("Sending request to Gemini API");
     
     const response = await fetch(API_URL, {
       method: "POST",
@@ -161,7 +185,7 @@ serve(async (req) => {
     });
 
     const data = await response.json();
-    console.log("Gemini API response:", data);
+    console.log("Gemini API response received");
     
     if (!response.ok) {
       throw new Error(data.error?.message || "Error calling Gemini API");
