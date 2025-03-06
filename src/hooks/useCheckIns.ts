@@ -71,8 +71,8 @@ export function useCheckIns() {
   const triggerManualCheckIn = async (type: "morning" | "evening" = "morning") => {
     setIsLoading(true);
     try {
-      // Use the Supabase instance's URL
-      const url = `${supabase.supabaseUrl}/functions/v1/daily-check-in`;
+      // Get the Supabase URL from our configuration
+      const url = `${import.meta.env.VITE_SUPABASE_URL || "https://gxvompiivgrprpcwnpmn.supabase.co"}/functions/v1/daily-check-in`;
       
       // Get the current session
       const { data: sessionData } = await supabase.auth.getSession();
