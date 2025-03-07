@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import MessageBubble from "./MessageBubble";
 import VoiceInput from "./VoiceInput";
@@ -6,7 +5,7 @@ import VoiceChatModal from "./VoiceChatModal";
 import ChatHistory from "./ChatHistory";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Mic, Send, Loader2, Volume2, VolumeX, Headphones, History, RefreshCw } from "lucide-react";
+import { Mic, Send, Loader2, Volume2, VolumeX, Headphones, History, RefreshCw, AlertCircle } from "lucide-react";
 import { motion } from "@/utils/animation";
 import { useAuth } from "@/context/AuthContext";
 import { useChatMessages, Message } from "@/hooks/useChatMessages";
@@ -30,6 +29,7 @@ const ChatInterface = () => {
   const [speechEnabled, setSpeechEnabled] = useState(true);
   const [lastChatDate, setLastChatDate] = useState<string | null>(null);
   const [isMessageSending, setIsMessageSending] = useState(false);
+  const [consecutiveErrors, setConsecutiveErrors] = useState(0);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
@@ -38,7 +38,6 @@ const ChatInterface = () => {
   const navigate = useNavigate();
   const tts = useRef(TextToSpeech.getInstance());
 
-  // Function to load messages with error handling
   const loadChatMessages = useCallback(async () => {
     if (!user) return;
     
@@ -52,30 +51,23 @@ const ChatInterface = () => {
         profile = await getProfile();
         setUserProfile(profile);
       } catch (profileError) {
-        // Continue even if profile loading fails
         console.error("Error loading profile:", profileError);
       }
       
-      // Get today's date
       const today = new Date().toISOString().split('T')[0];
       
-      // Check if we've already loaded messages today
       const storedChatDate = localStorage.getItem('last_chat_date');
       setLastChatDate(storedChatDate);
       
-      // If the stored date is different from today, reset the chat
       if (storedChatDate !== today) {
-        // This will clear today's messages if they exist
         await clearTodaysMessages();
         localStorage.setItem('last_chat_date', today);
         setLastChatDate(today);
       }
       
-      // Now load today's messages
       const chatMessages = await getMessages();
       
       if (chatMessages.length === 0) {
-        // Add personalized welcome message if no messages exist for today
         const welcomeMessage = profile?.name 
           ? `Hello ${profile.name}! How are you feeling today?` 
           : "Good morning! How are you feeling today?";
@@ -88,16 +80,22 @@ const ChatInterface = () => {
         };
         setMessages([initialMessage]);
         
-        // Save the welcome message to the database
-        await sendMessage(initialMessage.content, initialMessage.sender);
+        try {
+          await sendMessage(initialMessage.content, initialMessage.sender);
+        } catch (error) {
+          console.error("Failed to save welcome message:", error);
+        }
         
-        // Speak the welcome message
         tts.current.speak(welcomeMessage);
       } else {
         setMessages(chatMessages);
       }
+      
+      setConsecutiveErrors(0);
     } catch (error: any) {
       setLoadError(error);
+      setConsecutiveErrors(prev => prev + 1);
+      
       toast.error("Failed to load your chat", {
         description: "Please try refreshing the page",
         action: {
@@ -119,7 +117,6 @@ const ChatInterface = () => {
     loadChatMessages();
     
     return () => {
-      // Cancel any ongoing speech when component unmounts
       tts.current.cancel();
     };
   }, [user, navigate, loadChatMessages]);
@@ -135,10 +132,8 @@ const ChatInterface = () => {
   const handleSendMessage = async (text: string = inputText) => {
     if (text.trim() === "" || isMessageSending) return;
 
-    // Set sending state to prevent multiple sends
     setIsMessageSending(true);
     
-    // Create a temporary message with a temporary ID
     const tempUserMessage: Message = {
       id: `temp-${Date.now()}`,
       content: text,
@@ -149,43 +144,63 @@ const ChatInterface = () => {
     setMessages((prev) => [...prev, tempUserMessage]);
     setInputText("");
     
-    // Simulate coach typing
     setIsTyping(true);
     
-    // Cancel any ongoing speech
     tts.current.cancel();
     
     try {
-      // Save user message to database
       const savedUserMessage = await sendMessage(text, "user");
       
       if (savedUserMessage) {
-        // Replace the temporary message with the saved one
         setMessages((prev) => 
           prev.map(msg => msg.id === tempUserMessage.id ? savedUserMessage : msg)
         );
+      } else {
+        toast.error("Could not save your message, but continuing conversation");
       }
       
-      // Get AI response using Perplexity API with user context
       const aiResponse = await generateCoachResponse(text, messages);
       
-      // Save coach message to database
       const savedCoachMessage = await sendMessage(aiResponse, "coach");
       
       if (savedCoachMessage) {
         setMessages((prev) => [...prev, savedCoachMessage]);
-        
-        // Speak the AI response if speech is enabled
-        if (speechEnabled) {
-          setTimeout(() => {
-            // Add a small delay before speaking to prevent multiple voice responses
-            tts.current.speak(aiResponse);
-          }, 300);
-        }
+      } else {
+        const tempCoachMessage: Message = {
+          id: `temp-coach-${Date.now()}`,
+          content: aiResponse,
+          sender: "coach",
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, tempCoachMessage]);
+        toast.error("Could not save the AI response, but displaying it anyway");
       }
+      
+      if (speechEnabled) {
+        setTimeout(() => {
+          tts.current.speak(aiResponse);
+        }, 300);
+      }
+      
+      setConsecutiveErrors(0);
     } catch (error) {
       console.error("Error handling message:", error);
       toast.error("Something went wrong sending your message");
+      
+      const fallbackMessage: Message = {
+        id: `fallback-${Date.now()}`,
+        content: "I'm having trouble processing your message right now. Let's try again in a moment.",
+        sender: "coach",
+        timestamp: new Date(),
+      };
+      
+      setMessages((prev) => [...prev, fallbackMessage]);
+      
+      setConsecutiveErrors(prev => prev + 1);
+      
+      if (consecutiveErrors >= 2) {
+        toast.error("There seems to be a persistent issue connecting to the AI. Please try refreshing the page or checking your connection.");
+      }
     } finally {
       setIsTyping(false);
       setIsMessageSending(false);
@@ -203,13 +218,51 @@ const ChatInterface = () => {
     toast.info(newState ? "Voice feedback enabled" : "Voice feedback disabled");
   };
 
-  // Handle loading errors with retry button
+  if (consecutiveErrors >= 3) {
+    return (
+      <div className="h-full flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Connection issues detected</AlertTitle>
+              <AlertDescription>
+                We're having trouble connecting to our servers. This might be due to a network issue or a temporary service disruption.
+              </AlertDescription>
+            </Alert>
+            <div className="flex flex-col gap-2">
+              <Button 
+                className="w-full" 
+                onClick={() => {
+                  setConsecutiveErrors(0);
+                  loadChatMessages();
+                }}
+                variant="default"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Try Again
+              </Button>
+              <Button 
+                className="w-full" 
+                onClick={() => window.location.reload()}
+                variant="outline"
+              >
+                Refresh Page
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (loadError) {
     return (
       <div className="h-full flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6">
             <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
               <AlertTitle>Failed to load chat</AlertTitle>
               <AlertDescription>
                 There was a problem loading your chat messages. This could be due to a network issue.

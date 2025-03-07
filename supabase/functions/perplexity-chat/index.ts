@@ -102,7 +102,7 @@ function createSystemPrompt(userContext: any): string {
  * @param {string} message - Current user message
  * @returns {any[]} The messages array for the API
  */
-function prepareMessages(systemPrompt: string, history: any[], message: string): any[] {
+function prepareMessages(systemPrompt: string, history: any[] = [], message: string): any[] {
   const messages = [
     { role: "system", content: systemPrompt }
   ];
@@ -237,12 +237,17 @@ function createErrorResponse(error: Error): Response {
 async function handleChatRequest(req: Request): Promise<Response> {
   try {
     // Parse request
-    const requestData = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (error) {
+      throw new Error("Invalid JSON in request body");
+    }
     
     // Validate request
     validateRequest(requestData);
     
-    const { message, history, userContext } = requestData;
+    const { message, history = [], userContext = {} } = requestData;
     
     // Create system prompt
     const systemPrompt = createSystemPrompt(userContext);
@@ -259,6 +264,7 @@ async function handleChatRequest(req: Request): Promise<Response> {
     // Return the response
     return createSuccessResponse(generatedText);
   } catch (error: any) {
+    console.error("Error in Perplexity chat handler:", error);
     return createErrorResponse(error);
   }
 }

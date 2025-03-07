@@ -28,6 +28,7 @@ const Chat = () => {
   const [historyError, setHistoryError] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<any[]>([]);
   const [selectedVoice, setSelectedVoice] = useState<string>("21m00Tcm4TlvDq8ikWAM"); // Default to Rachel
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     try {
@@ -44,6 +45,8 @@ const Chat = () => {
       }
     } catch (error) {
       console.error("Error initializing text-to-speech:", error);
+    } finally {
+      setIsInitializing(false);
     }
   }, []);
 
@@ -134,6 +137,27 @@ const Chat = () => {
   };
 
   if (!user) return null;
+
+  // Show loading state while initializing TTS
+  if (isInitializing) {
+    return (
+      <PageTransition>
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1 container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+            <div className="max-w-4xl mx-auto h-[calc(100vh-180px)]">
+              <Card className="h-full overflow-hidden flex items-center justify-center">
+                <div className="text-center">
+                  <Skeleton className="h-8 w-8 rounded-full mx-auto mb-4" />
+                  <p className="text-muted-foreground">Initializing chat capabilities...</p>
+                </div>
+              </Card>
+            </div>
+          </main>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>

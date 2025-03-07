@@ -33,6 +33,8 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
           }
         } catch (error: any) {
           setError(error);
+          // Set a default coach style on error
+          setCoachStyle("supportive");
         } finally {
           setIsLoading(false);
         }
@@ -43,7 +45,12 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   }, [isCoach, getCoachSettings]);
   
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    try {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      console.error("Error formatting time:", error);
+      return "--:--"; // Fallback time format
+    }
   };
 
   const getCoachIcon = () => {
@@ -64,6 +71,11 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
         return <Bot className="h-4 w-4" />;
     }
   };
+
+  // Ensure valid timestamp
+  const safeTimestamp = message.timestamp instanceof Date && !isNaN(message.timestamp.getTime()) 
+    ? message.timestamp 
+    : new Date();
 
   return (
     <div className={`flex items-start gap-2 ${isCoach ? 'mr-12' : 'ml-12 flex-row-reverse'}`}>
@@ -98,7 +110,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
             isCoach ? '' : 'text-primary-foreground/70'
           }`}
         >
-          {formatTime(message.timestamp)}
+          {formatTime(safeTimestamp)}
         </div>
       </div>
     </div>

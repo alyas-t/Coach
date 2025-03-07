@@ -27,6 +27,8 @@ export async function withRetry<T>(
       const backoffDelay = initialDelay * Math.pow(2, retries);
       await new Promise(resolve => setTimeout(resolve, backoffDelay));
       retries++;
+      
+      console.info(`Retry attempt ${retries}/${maxRetries} after ${backoffDelay}ms`);
     }
   }
   
@@ -42,14 +44,35 @@ export async function withRetry<T>(
 export function handleSupabaseError(error: any, customMessage = "An error occurred"): string {
   if (!error) return customMessage;
   
+  // Log the full error for debugging
+  console.error("Supabase error:", error);
+  
   // Check if it's a network error
-  if (error.message?.includes("Failed to fetch") || error.name === "TypeError") {
+  if (error.message?.includes("Failed to fetch") || 
+      error.message?.includes("NetworkError") ||
+      error.name === "TypeError" ||
+      error.message?.includes("Network request failed")) {
     return "Network connection error. Please check your internet connection and try again.";
   }
   
   // Check if it's an auth error
   if (error.status === 401 || error.code === "PGRST301") {
     return "Authentication error. Please sign in again.";
+  }
+  
+  // Check for rate limiting
+  if (error.status === 429 || error.message?.includes("rate limit")) {
+    return "You've made too many requests. Please wait a moment and try again.";
+  }
+  
+  // Check for service unavailable
+  if (error.status === 503 || error.message?.includes("service unavailable")) {
+    return "The service is temporarily unavailable. Please try again later.";
+  }
+  
+  // Check for timeout
+  if (error.message?.includes("timeout") || error.message?.includes("timed out")) {
+    return "The request timed out. Please try again.";
   }
   
   // Return the error message or a fallback

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +33,7 @@ export function useChatMessages() {
   
   // Function to load the initial messages
   const loadInitialMessages = useCallback(async () => {
-    if (!user) return;
+    if (!user) return [];
     
     setIsLoading(true);
     setError(null);
@@ -63,11 +62,12 @@ export function useChatMessages() {
         return typedData;
       };
       
-      await withRetry(loadMessages);
+      return await withRetry(loadMessages);
     } catch (error: any) {
       setError(error);
       const errorMessage = handleSupabaseError(error, "Failed to load chat history");
       showErrorToast(errorMessage, loadInitialMessages);
+      return []; // Return empty array on error
     } finally {
       setIsLoading(false);
     }
@@ -165,25 +165,25 @@ export function useChatMessages() {
   const getMessages = async (): Promise<Message[]> => {
     if (!user) return [];
     
-    // If messages are already loaded, convert and return them
-    if (messages.length > 0) {
-      return messages
-        .slice()
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        .map(msg => ({
-          id: msg.id,
-          content: msg.content,
-          sender: msg.sender,
-          timestamp: new Date(msg.created_at)
-        }));
-    }
-    
-    // Otherwise load messages
     try {
-      await loadInitialMessages();
+      // If messages are already loaded, convert and return them
+      if (messages.length > 0) {
+        return messages
+          .slice()
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+          .map(msg => ({
+            id: msg.id,
+            content: msg.content,
+            sender: msg.sender,
+            timestamp: new Date(msg.created_at)
+          }));
+      }
+      
+      // Otherwise load messages
+      const loadedMessages = await loadInitialMessages();
     
       // Convert and return the loaded messages
-      return messages
+      return loadedMessages
         .slice()
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         .map(msg => ({
@@ -193,21 +193,26 @@ export function useChatMessages() {
           timestamp: new Date(msg.created_at)
         }));
     } catch (error) {
+      // Return empty array on error instead of throwing
       return [];
     }
   };
 
   // Function to send a message and return it in the Message format
   const sendMessage = async (content: string, sender: 'user' | 'coach'): Promise<Message | null> => {
-    const result = await addMessage(content, sender);
-    if (!result) return null;
-    
-    return {
-      id: result.id,
-      content: result.content,
-      sender: result.sender,
-      timestamp: new Date(result.created_at)
-    };
+    try {
+      const result = await addMessage(content, sender);
+      if (!result) return null;
+      
+      return {
+        id: result.id,
+        content: result.content,
+        sender: result.sender,
+        timestamp: new Date(result.created_at)
+      };
+    } catch (error) {
+      return null; // Return null instead of throwing on error
+    }
   };
 
   // Function to generate a coach response using Perplexity API
@@ -221,7 +226,8 @@ export function useChatMessages() {
             history: previousMessages.slice(-10).map(msg => ({  // Only use last 10 messages for context
               sender: msg.sender,
               content: msg.content
-            }))
+            })),
+            userContext: {} // Add empty user context to prevent undefined errors
           }
         });
         
@@ -317,12 +323,8 @@ export function useChatMessages() {
     }
   }, [user]);
   
-  // Load initial messages on component mount
-  useEffect(() => {
-    if (user) {
-      loadInitialMessages();
-    }
-  }, [user, loadInitialMessages]);
+  // We'll no longer auto-load messages on component mount
+  // Instead, we'll explicitly call getMessages when needed
   
   return {
     messages: messages.slice().sort((a, b) => 
